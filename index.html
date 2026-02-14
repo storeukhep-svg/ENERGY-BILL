@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UKHEP Energy Bill & Automation System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* ================= GLOBAL STYLES ================= */
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1400px; margin: auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); min-height: 800px; position: relative; }
+        
+        /* PROGRESS BAR STYLES */
+        .progress-wrapper { margin-bottom: 25px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; }
+        .progress-container { width: 100%; background-color: #e0e0e0; height: 12px; border-radius: 10px; overflow: hidden; position: relative; }
+        .progress-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; border-radius: 10px; }
+        
+        .progress-info { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .progress-pct { font-size: 1.1em; color: #333; font-weight: bold; }
+        
+        /* NEW ENHANCED HINT STYLE */
+        .input-hint { 
+            color: #d35400; 
+            font-weight: 800; /* Bolder */
+            font-size: 1.1em; /* Bigger */
+            text-align: right;
+            background-color: #fff3e0;
+            padding: 8px 15px;
+            border-radius: 4px;
+            border-left: 5px solid #e67e22;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            animation: fadeInHint 0.5s ease-in-out;
+            margin-left: 20px;
+            flex-grow: 1;
+        }
+        .input-hint.ready { color: #27ae60; border-left-color: #2ecc71; background-color: #e8f8f5; }
+
+        @keyframes fadeInHint { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* HEADER & CONTROLS */
+        .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #2c3e50; padding-bottom: 15px; margin-bottom: 20px; }
+        .header-title-group { display: flex; align-items: center; gap: 20px; }
+        .header-text { text-align: left; }
+        .main-title { font-size: 1.4em; font-weight: bold; color: #2c3e50; text-transform: uppercase; margin: 0; }
+        .sub-title { font-size: 1.1em; color: #7f8c8d; font-weight: 600; margin-top: 5px; }
+        .ohpc-logo { height: 70px; width: auto; object-fit: contain; }
+
+        .control-panel { display: flex; gap: 10px; align-items: flex-end; flex-wrap: nowrap; white-space: nowrap; }
+        .date-selector, .view-panel { padding: 8px; border-radius: 5px; border: 1px solid #ccc; display: flex; align-items: center; gap: 5px; }
+        .date-selector { background: #ecf0f1; border-color: #bdc3c7; }
+        .view-panel { background: #e8f6f3; border-color: #1abc9c; }
+        .panel-group { display: flex; flex-direction: column; align-items: flex-start; margin-right: 5px; }
+        .panel-label { font-size: 0.75em; font-weight: bold; display: block; margin-bottom: 2px; }
+        .lbl-current { color: #2c3e50; } .lbl-view { color: #16a085; }
+        .date-dropdown { padding: 4px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #2c3e50; width: auto; }
+
+        /* BUTTONS */
+        .btn-save-bill { background-color: #27ae60; color: white; padding: 8px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
+        .btn-save-bill:hover { background-color: #2ecc71; }
+        .btn-create-bill { background-color: #8e44ad; color: white; padding: 8px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
+        .btn-create-bill:hover { background-color: #9b59b6; }
+        .btn-load-bill { background-color: #3498db; color: white; padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .btn-del-ver { background-color: #c0392b; color: white; padding: 6px 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8em; display: none; white-space: nowrap; }
+        .btn-del-ver:hover { background-color: #e74c3c; }
+
+        .sheet-footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px dashed #ccc; }
+        .btn-sheet-save { background-color: #16a085; color: white; padding: 10px 30px; font-size: 15px; border: none; border-radius: 30px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .btn-sheet-save:hover { background-color: #1abc9c; transform: scale(1.05); }
+        .btn-update-mode { background-color: #d35400; color: white; padding: 10px 30px; font-size: 15px; border: none; border-radius: 30px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-left: 10px; display: none; }
+        .btn-excel-sheet { background-color: #217346; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .btn-workbook { background-color: #8e44ad; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        
+        .btn-sheet-edit { background-color: #8e44ad; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .btn-sheet-edit.unlocked { background-color: #c0392b; }
+
+        /* BACKUP BUTTONS */
+        .btn-backup { background-color: #2c3e50; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 5px; }
+        .btn-restore { background-color: #e74c3c; color: white; padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 5px; }
+
+        .footer-actions { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee; }
+        .btn-action { padding: 12px 25px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; margin: 0 5px; font-weight: bold; color: white; }
+        .btn-print { background-color: #2c3e50; }
+        .btn-edit-mode { background-color: #f39c12; }
+
+        /* TABS */
+        .tab-container { display: flex; justify-content: center; margin-bottom: 25px; border-bottom: 1px solid #ddd; flex-wrap: wrap; background: #fafafa; padding: 10px 0; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border: 1px solid #ccc; background-color: white; color: #555; margin: 0 5px 5px 0; border-radius: 4px; transition: all 0.2s ease; }
+        .tab-btn:hover { background-color: #e2e6ea; color: #2c3e50; }
+        .tab-btn.active { background-color: #2c3e50; color: white; border-color: #2c3e50; transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+        /* LOCKED / WARNING STYLES (GATEKEEPER) */
+        .locked-sheet-overlay { opacity: 0.5; pointer-events: none; user-select: none; filter: grayscale(100%); }
+        .locked-warning-banner { 
+            background-color: #c0392b; color: white; text-align: center; padding: 15px; 
+            font-weight: bold; font-size: 1.2em; border-radius: 5px; margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); border: 2px solid #922b21;
+            display: none;
+            animation: pulseWarning 2s infinite;
+        }
+        @keyframes pulseWarning { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        /* TABLES */
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        th, td { border: 1px solid #bdc3c7; padding: 8px 6px; text-align: center; vertical-align: middle; position: relative; }
+        th { background-color: #e9ecef; height: 35px; color: #2c3e50; font-weight: bold; }
+        
+        #abstract table th { background-color: #34495e; color: white; padding: 10px; }
+        #abstract table td { font-size: 12px; padding: 10px; }
+        #abstract .abs-total-row { background-color: #ecf0f1; font-weight: bold; border-top: 2px solid #2c3e50; }
+        #abstract .abs-val { text-align: right; }
+
+        /* INPUT FIELDS - KEY LOGIC FOR HIGHLIGHTING */
+        .sheet-content input { 
+            width: 85%; padding: 6px; border: 1px solid #bbb; border-radius: 3px; text-align: right; 
+            font-family: inherit; font-size: 12px; transition: all 0.3s ease; 
+            outline: none;
+        }
+        .sheet-content input:not(.filled):not([readonly]):not(.error-input):not(.editable-locked) { background-color: #fffde7; border-color: #f1c40f; }
+        .sheet-content input[readonly]:not(.editable-locked) { background-color: #e9ecef !important; color: #555; cursor: default; font-weight: bold; border-color: #ccc; }
+        
+        .sheet-content input.filled:not(.error-input):not(.editable-locked) { 
+            background-color: #dcedc8 !important; border-color: #27ae60 !important; color: #145a32; font-weight: bold;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2327ae60' width='18px' height='18px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 5px center; padding-right: 25px; 
+        }
+        
+        .sheet-content input:focus { border-color: #3498db !important; box-shadow: 0 0 8px rgba(52, 152, 219, 0.5); background-color: #fff !important; transform: scale(1.05); }
+
+        /* DIFFERENCE HIGHLIGHTING (ORANGE) */
+        .diff-highlight {
+            background-color: #fff3e0 !important;
+            border: 2px solid #e67e22 !important;
+            color: #d35400 !important;
+            font-weight: 900 !important;
+            box-shadow: 0 0 5px rgba(230, 126, 34, 0.5) !important;
+        }
+
+        .editable-locked {
+            background-color: #e9ecef !important; color: #333 !important; border-color: #ccc !important;
+            cursor: default !important; font-weight: bold; padding-right: 6px; background-image: none;
+        }
+        
+        .error-input { background-color: #ffdddd !important; border: 2px solid #ff0000 !important; color: #ff0000 !important; font-weight: 900 !important; box-shadow: 0 0 8px rgba(255, 0, 0, 0.8) !important; }
+        
+        .guide-arrow::after {
+            content: "⬅"; position: absolute; right: -40px; top: 50%; transform: translateY(-50%);
+            color: #ff5722; font-size: 35px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            animation: pointLeft 0.6s infinite alternate ease-in-out; z-index: 10; pointer-events: none;
+        }
+        @keyframes pointLeft { from { right: -40px; transform: translateY(-50%) scale(1); opacity: 0.8; } to { right: -55px; transform: translateY(-50%) scale(1.3); opacity: 1; color: #e64a19; } }
+
+        /* CONFIG & PAFM */
+        .config-table td { text-align: left; padding: 8px 15px; }
+        .config-label { font-weight: bold; width: 35%; color: #2c3e50; }
+        .config-input { width: 95%; }
+        .data-label { text-align: left; padding-left: 20px; font-weight: bold; width: 60%; }
+        .data-value { text-align: right; font-weight: bold; font-size: 1.1em; }
+        .section-title { background-color: #34495e; color: white; text-align: left; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; }
+        
+        #pafm { padding: 10px; }
+        .pafm-wrapper { color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .pafm-wrapper h2 { color: #2c3e50; text-align: center; margin: 10px 0; }
+        .dashboard-row { display: flex; gap: 20px; margin-bottom: 20px; align-items: flex-start; }
+        .left-column { flex: 0 0 380px; display: flex; flex-direction: column; gap: 20px; }
+        .right-column { flex: 1; }
+        .box { background: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .maint-panel { border-left: 5px solid #d35400; display: block; } 
+        .maint-header { color: #d35400; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .pafm-wrapper .form-group { margin-bottom: 15px; text-align: left; }
+        .pafm-wrapper label { display: block; font-weight: bold; margin-bottom: 5px; color: #2c3e50; font-size: 0.9em; }
+        .pafm-wrapper input, .pafm-wrapper select { width: 100%; padding: 8px; border: 1px solid #ccc !important; border-radius: 4px; box-sizing: border-box; background-color: white !important; animation: none !important; text-align: left !important; color: #333; font-weight: normal; font-size: 13px; }
+        .split-input { display: flex; gap: 10px; } .split-input input[type="date"] { flex: 2; }
+        .btn-gen { width: 100%; background: #3498db; color: white; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
+        .btn-maint { width: 100%; background: #d35400; color: white; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
+        .btn-calc { background: #8e44ad; color: white; padding: 15px 40px; font-size: 1.1em; display: block; margin: 20px auto; border-radius: 30px; cursor: pointer; border: none; font-weight: bold; }
+        .btn-excel { background: #217346; color: white; padding: 10px 20px; margin-top: 15px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
+        .btn-save-final { background: #27ae60; color: white; padding: 10px 20px; margin-left: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8em; margin: 0 2px; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-view { background: #3498db; } .btn-del { background: #c0392b; }
+        .calendar-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #2c3e50; color: white; padding: 10px; text-align: center; font-weight: bold; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid #ddd; background: white; }
+        .day-cell { height: 100px; border: 1px solid #eee; padding: 5px; cursor: pointer; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .day-cell:hover { background-color: #eaf2f8; }
+        .day-number { font-weight: bold; font-size: 1.1em; margin-bottom: 2px; text-align: right; color: #555; }
+        .event-list { font-size: 0.75em; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+        .cal-event { background: #ecf0f1; padding: 2px 4px; border-radius: 3px; border-left: 3px solid #3498db; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #2c3e50; text-align: left; }
+        .cal-event.maint-event { border-left-color: #d35400; background: #fbeee6; }
+        .result-box { text-align: center; font-size: 1.8em; color: #2c3e50; margin-top: 20px; padding: 15px; background-color: #e8f8f5; border: 2px solid #27ae60; border-radius: 8px; }
+
+        /* BILL GEN STYLES */
+        #billgen table td { text-align: left; padding: 6px 10px; }
+        #billgen .amt-col { text-align: right; font-weight: bold; }
+        #billgen .bill-header { text-align: center; font-weight: bold; font-size: 1.2em; border: 2px solid #333; padding: 15px; margin-bottom: 20px; background: #fff; }
+        #billgen .total-bill-row { background-color: #2c3e50; color: white; font-weight: bold; font-size: 1.2em; }
+
+        .sheet-content { display: none; animation: fadeIn 0.4s; }
+        .sheet-content.active { display: block; }
+        .unlock-btn { background-color: #e67e22; color: white; border: none; padding: 5px 10px; font-size: 11px; cursor: pointer; border-radius: 4px; float: right; }
+        .readonly-cell { background-color: #f8f9fa; font-weight: bold; color: #2c3e50; }
+        .ohpc-header { text-align: center; font-weight: bold; border: none; margin-bottom: 20px; }
+        .archive-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+        .archive-table th { background: #34495e; color: white; padding: 8px; }
+        .archive-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 25px; width: 400px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { border: none; box-shadow: none; width: 100%; padding: 0; margin: 0; }
+            .tab-container, .footer-actions, .unlock-btn, .header-container, .dashboard-row, .sheet-footer, .progress-container { display: none; } 
+            .sheet-content { display: none; }
+            .sheet-content.active { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="progress-wrapper">
+        <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-info">
+            <span class="progress-pct" id="progressText">0% Completed</span>
+            <div id="inputHint" class="input-hint">Loading...</div>
+        </div>
+    </div>
+
+    <div class="header-container">
+        <div class="header-title-group">
+            <div class="header-text">
+                <h1 class="main-title">Upper Kolab Hydro Electric Project</h1>
+                <div class="sub-title">Energy Bill & Automation System</div>
+            </div>
+            <img src="logo.png" class="ohpc-logo" alt="OHPC Logo" onerror="this.style.display='none'">
+        </div>
+        
+        <div class="control-panel">
+            <div class="view-panel">
+                <div class="panel-group">
+                    <span class="panel-label lbl-view">VIEW PREVIOUS BILL</span>
+                    <div style="display:flex; gap:3px;">
+                         <select id="view_month" class="date-dropdown" onchange="checkForVersions()"></select>
+                         <select id="view_year" class="date-dropdown" onchange="checkForVersions()"></select>
+                         <select id="view_version" class="date-dropdown" style="display:none;"></select>
+                    </div>
+                </div>
+                <button class="btn-load-bill" onclick="loadPreviousBill()">Load</button>
+                <button id="btn_delete_version" class="btn-del-ver" onclick="deleteCurrentVersion()">Delete</button>
+            </div>
+            <div class="date-selector">
+                <div class="panel-group">
+                     <span class="panel-label lbl-current">CREATE BILL</span>
+                     <div style="display:flex; gap:3px;">
+                        <select id="sel_month" class="date-dropdown" onchange="updateDateConfig()"></select>
+                        <select id="sel_year" class="date-dropdown" onchange="updateDateConfig()"></select>
+                     </div>
+                </div>
+                <button class="btn-create-bill" onclick="createNewBill()">✨ Create</button>
+                <button class="btn-save-bill" onclick="saveWithValidation(true, false)">💾 SAVE BILL</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tab-container">
+        <div class="tab-btn active" onclick="switchTab('pafm')">1. PAFM</div>
+        <div class="tab-btn" onclick="switchTab('optcl')">2. OPTCL</div>
+        <div class="tab-btn" onclick="switchTab('gridco')">3. GRIDCO</div>
+        <div class="tab-btn" onclick="switchTab('ohpc')">4. OHPC</div>
+        <div class="tab-btn" onclick="switchTab('psdf')">5. PSDF</div>
+        <div class="tab-btn" onclick="switchTab('kv11')">6. 11KV</div>
+        <div class="tab-btn" onclick="switchTab('govt')">7. GOVT</div>
+        <div class="tab-btn" onclick="switchTab('summary')">8. SUMMARY</div>
+        <div class="tab-btn" onclick="switchTab('netexport')">9. NET EXPORT</div>
+        <div class="tab-btn" onclick="switchTab('billgen')">10. BILL</div>
+        <div class="tab-btn" onclick="switchTab('abstract')">11. ABSTRACT</div>
+    </div>
+
+    <div id="global_warning" class="locked-warning-banner">🔒 LOCKED: Please finalize PAFM first.</div>
+
+    <div id="pafm" class="sheet-content active">
+        <div class="pafm-wrapper">
+            <h2>PAFM Calculator (Dynamic Capacity)</h2>
+            <div class="dashboard-row">
+                <div class="left-column">
+                    <div id="maintPanel" class="box maint-panel">
+                        <h3 class="maint-header">Monthly or Capital Maintenance</h3>
+                        <div class="form-group"><label>Type</label><select id="maintType"><option value="Monthly Maintenance">Monthly Maintenance</option><option value="Capital Maintenance">Capital Maintenance</option></select></div>
+                        <div class="form-group"><label>Unit</label><select id="maintUnit"><option value="Unit-1">Unit-1</option><option value="Unit-2">Unit-2</option><option value="Unit-3">Unit-3</option><option value="Unit-4">Unit-4</option></select></div>
+                        <div class="form-group"><label>From (Date & Time)</label><div class="split-input"><input type="date" id="maintStartDate"><input type="text" id="maintStartTime" placeholder="HH:MM" onblur="formatTimeInput(this)"></div></div>
+                        <div class="form-group"><label>To (Date & Time)</label><div class="split-input"><input type="date" id="maintEndDate"><input type="text" id="maintEndTime" placeholder="HH:MM" onblur="formatTimeInput(this)"></div></div>
+                        <button class="btn-maint" onclick="applyMaintenance()">Enter</button>
+                    </div>
+                </div>
+                <div class="right-column">
+                    <div id="calendarBox" class="box" style="display:block;"><h3 id="calTitle">Calendar</h3><div class="calendar-header"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div><div id="calGrid" class="calendar-grid"></div></div>
+                </div>
+            </div>
+            <div id="logSection" class="box table-container">
+                <h3>Outage Log (Daily & Maintenance)</h3>
+                <table id="logTable"><thead><tr><th>Date</th><th>Unit</th><th>Type</th><th>Time Affected</th><th>Start</th><th>End</th><th>Status</th><th>Actions</th></tr></thead><tbody id="logBody"></tbody></table>
+                <button class="btn-calc" onclick="calculateFinalSheet()">Generate PAFM Computation Sheet</button>
+            </div>
+            <div id="finalSection" class="box table-container">
+                <h3>PAFM Computation Sheet</h3><table id="finalTable"><thead><tr><th style="width:100px;">Date</th><th>Installed Capacity<br>(MW) [IC]</th><th>Declared Capacity<br>(Ex-Bus) [DCi]</th><th>Outage Units</th><th>Time Period</th><th>Reason</th></tr></thead><tbody id="finalBody"></tbody><tfoot><tr style="background:#eee; font-weight:bold;"><td>TOTAL</td><td id="totalIC">0.00</td><td id="totalDCi">0.00</td><td colspan="3"></td></tr></tfoot></table>
+                <div class="result-box">PAFM Result: <span id="pafmValue">0.0000000</span> %</div>
+                <center><button class="btn-excel" onclick="exportToExcel()">Download to Excel</button><button class="btn-save-final" onclick="saveFinalEntry()">Final Entry (Lock & Save)</button></center>
+            </div>
+            <div id="archiveSection" class="box" style="margin-top: 20px;">
+                <h3>Finalized Monthly Records</h3><table class="archive-table"><thead><tr><th>Year</th><th>Month</th><th>Final PAFM (%)</th><th>Saved On</th><th>Actions</th></tr></thead><tbody id="archiveBody"></tbody></table>
+            </div>
+        </div>
+        <div class="sheet-footer"><button class="btn-sheet-save" onclick="goToNextTab('pafm')">💾 Save & Next &raquo;</button> <button class="btn-excel-sheet" onclick="exportCurrentSheet('pafm')">📥 Export Sheet</button></div>
+    </div>
+
+    <div id="optcl" class="sheet-content">
+        <div class="sub-header">APEX METER OPTCL (MAIN)</div>
+        <table id="table_optcl"><thead><tr><th>Sl.</th><th>Feeder Name</th><th>Meter Details</th><th>Exp/Imp</th><th>Initial</th><th>Final</th><th>Advance</th><th>M.F.</th><th>Energy</th><th>Net (KWH)</th></tr></thead><tbody id="body_optcl"></tbody><tfoot><tr class="total-row"><td colspan="9" style="text-align: right; padding-right: 20px;">TOTAL EXPORT (OPTCL):</td><td id="total_optcl">0.00</td></tr></tfoot></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('optcl')">✏️ Edit OPTCL</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('optcl')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('optcl')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="gridco" class="sheet-content">
+        <div class="sub-header">APEX METER GRIDCO (CHECK-1)</div>
+        <table id="table_gridco"><thead><tr><th>Sl.</th><th>Feeder Name</th><th>Meter Details</th><th>Exp/Imp</th><th>Initial</th><th>Final</th><th>Advance</th><th>M.F.</th><th>Energy</th><th>Net (KWH)</th></tr></thead><tbody id="body_gridco"></tbody><tfoot><tr class="total-row"><td colspan="9" style="text-align: right; padding-right: 20px;">TOTAL EXPORT (GRIDCO):</td><td id="total_gridco">0.00</td></tr></tfoot></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('gridco')">✏️ Edit GRIDCO</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('gridco')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('gridco')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="ohpc" class="sheet-content">
+        <div class="sub-header">APEX METER OHPC (CHECK-2)</div>
+        <table id="table_ohpc"><thead><tr><th>Sl.</th><th>Feeder Name</th><th>Meter Details</th><th>Exp/Imp</th><th>Initial</th><th>Final</th><th>Advance</th><th>M.F.</th><th>Energy</th><th>Net (KWH)</th></tr></thead><tbody id="body_ohpc"></tbody><tfoot><tr class="total-row"><td colspan="9" style="text-align: right; padding-right: 20px;">TOTAL EXPORT (OHPC):</td><td id="total_ohpc">0.00</td></tr></tfoot></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('ohpc')">✏️ Edit OHPC</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('ohpc')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('ohpc')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="psdf" class="sheet-content">
+        <div class="sub-header">33 KV SIDE OF (220/33 KV, 7.5 MVA T/F) PSDF FEEDER</div>
+        <table id="table_psdf"><thead><tr><th>Sl.</th><th>Feeder Name</th><th>Exp/Imp</th><th>Initial (MWH)</th><th>Final (MWH)</th><th>Diff</th><th>M.F.</th><th>Energy (KWH)</th></tr></thead><tbody id="body_psdf"></tbody></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('psdf')">✏️ Edit PSDF</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('psdf')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('psdf')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="kv11" class="sheet-content">
+        <div class="sub-header">JOINT ENERGY METER READING OF 11 KV BARINIPUT FEEDER</div>
+        <table id="table_kv11"><thead><tr><th>Sl.</th><th>Location</th><th>T.O.D.</th><th>Initial</th><th>Final</th><th>Advance (Wh)</th><th>M.F.</th><th>Energy (KWH)</th></tr></thead><tbody id="body_kv11"></tbody><tfoot><tr class="total-row"><td colspan="7" style="text-align: right; padding-right: 20px;">TOTAL EXPORT (KWH):</td><td id="total_kv11">0.00</td></tr></tfoot></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('kv11')">✏️ Edit 11KV</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('kv11')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('kv11')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="govt" class="sheet-content">
+        <div class="sub-header">OHPC vs GOVT STATEMENT</div>
+        <table id="table_govt"><thead><tr><th>Sl.</th><th>Equipment</th><th>Initial</th><th>Final</th><th>Diff</th><th>M.F.</th><th>Actual Energy (KWH)</th></tr></thead><tbody id="body_govt"></tbody></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('govt')">✏️ Edit GOVT</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('govt')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('govt')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="summary" class="sheet-content">
+        <div class="sub-header">MONTHLY DATA & BILLING PARAMETERS</div>
+        <div class="section-title">A. BILL CONFIGURATION</div>
+        <table class="config-table">
+            <tr><td class="config-label">Month:</td><td><input type="text" class="config-input locked-field" id="cfg_month" readonly></td><td class="config-label">Year:</td><td><input type="text" class="config-input locked-field" id="cfg_year" readonly></td></tr>
+            <tr><td class="config-label">Days In Month (NDM):</td><td><input type="text" class="config-input locked-field" id="cfg_days" readonly></td><td class="config-label">Bill No:</td><td><input type="text" class="config-input" id="cfg_billno" placeholder="Auto-Generating..."></td></tr>
+            <tr><td class="config-label">Financial Year:</td><td><input type="text" class="config-input locked-field" id="cfg_fyear" value="2025-26" readonly></td><td class="config-label">Approved NAPAF (%):</td><td><input type="text" class="config-input locked-field" id="cfg_napaf" value="87" readonly></td></tr>
+            <tr><td class="config-label">Approved ARR (Rs. in Crores):</td><td><input type="text" class="config-input locked-field" id="cfg_arr" value="81.124" readonly></td><td class="config-label">Annual Capacity Charge (Rs. Cr):</td><td><input type="text" class="config-input locked-field" id="cfg_cap" value="40.562" readonly></td></tr>
+            <tr><td class="config-label">Annual Energy Charge (Rs. Cr):</td><td><input type="text" class="config-input locked-field" id="cfg_eng" value="40.562" readonly></td><td class="config-label">Energy Charge Rate (Paise/Unit):</td><td><input type="text" class="config-input locked-field" id="cfg_rate" value="49.245" readonly></td></tr>
+        </table>
+        <div class="section-title">B. ENERGY DATA SUMMARY</div>
+        <table id="table_summary"><thead><tr><th style="width: 70%;">Description</th><th>Value (KWH)</th></tr></thead><tbody>
+                <tr><td class="data-label">Net Power Export through 220 KV Feeder-I</td><td><input type="text" id="sum_feeder1" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Net Power Export through 220 KV Feeder-II</td><td><input type="text" id="sum_feeder2" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Net Power Export through 220 KV Feeder-III</td><td><input type="text" id="sum_feeder3" class="data-value" readonly></td></tr>
+                <tr style="background-color: #e8f8f5;"><td class="data-label">Net Power Export during the month (Sum I+II+III)</td><td><input type="text" id="sum_total_export" class="data-value" style="color:#16a085;" readonly></td></tr>
+                <tr><td class="data-label">33 KV Import from Jayanagar</td><td><input type="number" id="sum_jayanagar" class="data-value" oninput="calc('summary', this)" placeholder="Enter Value" value="204"></td></tr>
+                <tr><td class="data-label">11 KV Bariniput Feeder Consumption</td><td><input type="text" id="sum_11kv" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Net Import through 33 KV PSDF Feeder</td><td><input type="text" id="sum_psdf" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Total Generation during the Month</td><td><input type="text" id="sum_gen" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Unit Aux. Consumption during the Month</td><td><input type="text" id="sum_uab" class="data-value" readonly></td></tr>
+                <tr><td class="data-label">Net Power Export Through 220/33 KV (7.5MVA) Feeder</td><td><input type="text" id="sum_tf220" class="data-value" readonly></td></tr>
+        </tbody></table>
+        <div class="sheet-footer">
+            <button class="btn-sheet-edit" onclick="toggleSheetEdit('summary')">✏️ Edit Summary</button>
+            <button class="btn-sheet-save" onclick="goToNextTab('summary')">💾 Save & Next &raquo;</button> 
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('summary')">📥 Export Sheet</button>
+        </div>
+    </div>
+
+    <div id="netexport" class="sheet-content">
+        <table id="table_netexport"><thead><tr><th style="width:5%;">SL NO</th><th style="width:75%; text-align:left;">PARTICULARS</th><th style="width:20%;">Net (MU)</th></tr></thead><tbody>
+            <tr><td>1</td><td style="text-align:left;">Net Power Export Through-Jayanagar 220 KV Feeder-I</td><td id="ne_1" class="data-value">0.000000</td></tr>
+            <tr><td>2</td><td style="text-align:left;">Net Power Export Through-Jayanagar 220 KV Feeder-II</td><td id="ne_2" class="data-value">0.000000</td></tr>
+            <tr><td>3</td><td style="text-align:left;">Net Power Export Through-Theruvalli 220 KV Feeder-III</td><td id="ne_3" class="data-value">0.000000</td></tr>
+            <tr><td>4</td><td style="text-align:left;">Net Power import through 33 KV Side of (220/33 kv,7.5 MVA ) PSDF Feeder</td><td id="ne_4" class="data-value">0.000000</td></tr>
+            <tr><td>5</td><td style="text-align:left;">33 KV Import From Jayanagar Grid</td><td id="ne_5" class="data-value">0.000000</td></tr>
+            <tr class="subtotal-row"><td>6</td><td style="text-align:left;">Total Import throgh 33/11 kv T/F (Sl 4 + Sl 5)</td><td id="ne_6" class="data-value">0.000000</td></tr>
+            <tr><td>7</td><td style="text-align:left;">11 KV Bariniput Feeder Consumption</td><td id="ne_7" class="data-value">0.000000</td></tr>
+            <tr><td>8</td><td style="text-align:left;">Bariniput Consumption Equivalent to 33KV [Sl.7 + 0.5%]</td><td id="ne_8" class="data-value">0.000000</td></tr>
+            <tr><td>9</td><td style="text-align:left;">Station Aux Consumption Eq. to 33KV (Sl 4 - 8)</td><td id="ne_9" class="data-value">0.000000</td></tr>
+            <tr><td>10</td><td style="text-align:left;">Station Aux Consumption Eq. to 220KV [Sl 9 + 0.5%]</td><td id="ne_10" class="data-value">0.000000</td></tr>
+            <tr><td>11</td><td style="text-align:left;">Station Aux Consumption Eq. to 33KV (Import JNR)</td><td id="ne_11" class="data-value">0.000000</td></tr>
+            <tr><td>12</td><td style="text-align:left;">Station Aux Consumption Eq. to 220KV [Sl 11 + 0.5%]</td><td id="ne_12" class="data-value">0.000000</td></tr>
+            <tr class="subtotal-row"><td>13</td><td style="text-align:left;">Total station Auxiliary Consumption (Sl 10 + 12)</td><td id="ne_13" class="data-value">0.000000</td></tr>
+            <tr class="total-row"><td>14</td><td style="text-align:left;">Net Energy Transmitted to OPTCL (Sl 1+2+3 - Sl 12)</td><td id="ne_14" class="data-value" style="font-size:1.3em;">0.000000</td></tr>
+        </tbody></table>
+        <div class="sheet-footer"><button class="btn-sheet-save" onclick="goToNextTab('netexport')">💾 Save & Next &raquo;</button> <button class="btn-excel-sheet" onclick="exportCurrentSheet('netexport')">📥 Export Sheet</button></div>
+    </div>
+
+    <div id="billgen" class="sheet-content">
+        <div class="ohpc-header">
+            <div>ODISHA HYDRO POWER CORPORATION LIMITED.</div>
+            <div>UPPER KOLAB HYDRO ELECTRIC PROJECT, BARINIPUT</div>
+        </div>
+        <div class="bill-header">BILL OF ENERGY EXPORT TO GRIDCO</div>
+        <table style="width:100%; border:2px solid #000;">
+            <tr class="bill-row"><td style="width:50%;"><strong>1. Bill No. & Date:</strong> <span id="bill_no_display"></span></td><td style="width:50%;"><strong>Date:</strong> <span id="bill_date_display"></span></td></tr>
+            <tr class="bill-row"><td><strong>2. Approved ARR (Rs. in Crores):</strong></td><td class="amt-col" id="bill_arr">0.00</td></tr>
+            <tr class="bill-row"><td><strong>3. Approved Annual Capacity Charge (Rs. in Crores):</strong></td><td class="amt-col" id="bill_annual_cap">0.00</td></tr>
+            <tr class="bill-row"><td><strong>4. Approved Annual Energy Charge (Rs. in Crores):</strong></td><td class="amt-col" id="bill_annual_eng">0.00</td></tr>
+            <tr class="bill-row"><td><strong>5. Approved Energy Charge Rate (Paise/Unit):</strong></td><td class="amt-col" id="bill_rate">0.00</td></tr>
+            <tr class="bill-row"><td><strong>6. Approved NAPAF (%):</strong></td><td class="amt-col" id="bill_napaf">0.00</td></tr>
+            <tr class="bill-row"><td><strong>7. Ex-bus energy generated for the month (MU):</strong><br><small>(Net Energy Transmitted to OPTCL)</small></td><td class="amt-col" id="bill_exbus">0.000000</td></tr>
+            <tr class="bill-row"><td><strong>8. Energy Charge for the month (Rs. in Crores):</strong><br><small>= (Sl No 7 * Sl No 5) / 1000</small></td><td class="amt-col" id="bill_eng_chg">0.0000000</td></tr>
+            <tr class="bill-row"><td><strong>9. Sum of Declared Capacity (Ex-Bus) MW [DCi]:</strong></td><td class="amt-col" id="bill_sum_dci">0.00</td></tr>
+            <tr class="bill-row"><td><strong>10. Sum of Installed Capacity MW [IC] (N x IC):</strong></td><td class="amt-col" id="bill_sum_ic">0.00</td></tr>
+            <tr class="bill-row"><td><strong>11. PAFM (%):</strong></td><td class="amt-col" id="bill_pafm">0.00000000</td></tr>
+            <tr class="bill-row"><td><strong>12. Capacity Charge for the month (Rs. in Crores):</strong><br><small>= (Sl No 3 * NDM * Sl No 11) / (NDY * Sl No 6)</small></td><td class="amt-col" id="bill_cap_chg">0.0000000</td></tr>
+            <tr class="bill-row total-bill-row"><td>13. TOTAL BILL AMOUNT (Rs. in Crores):</td><td class="amt-col" id="bill_total">0.0000000</td></tr>
+            <tr><td colspan="2" style="padding:15px; font-style:italic;"><strong>Amount in Words:</strong> Rupees <span id="bill_words">Zero</span> Only.</td></tr>
+        </table>
+        
+        <div class="sheet-footer">
+            <button class="btn-sheet-save" onclick="saveWithValidation(true, false)">💾 Save Bill</button>
+            <button class="btn-update-mode" id="btn_bill_update" onclick="saveWithValidation(true, true)">💾 Update & Save Changes</button>
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('billgen')">📥 Export Sheet</button>
+            <button class="btn-workbook" onclick="exportWorkbook()">🗂️ Export Full Workbook</button>
+        </div>
+        <div class="sheet-footer" style="margin-top:20px; border-top:1px solid #eee; padding-top:15px;">
+             <button class="btn-backup" onclick="backupDatabase()">📂 Backup Database</button>
+             <button class="btn-restore" onclick="triggerRestore()">♻️ Restore Database</button>
+             <input type="file" id="restoreFile" style="display:none;" onchange="restoreDatabase(this)">
+        </div>
+    </div>
+
+    <div id="abstract" class="sheet-content">
+        <div class="sub-header" id="abs_header">ABSTRACT OF BILLING</div>
+        <table id="table_abstract">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Energy Sent to GRIDCO (MU)</th>
+                    <th>Energy Charges (Rs. Cr)</th>
+                    <th>PAFM (%)</th>
+                    <th>Capacity Charges (Rs. Cr)</th>
+                    <th>Total Amount (Rs. Cr)</th>
+                    <th>Cumulative PAFM (%)</th>
+                </tr>
+            </thead>
+            <tbody id="body_abstract">
+                </tbody>
+            <tfoot>
+                <tr class="abs-total-row">
+                    <td>TOTAL / AVG</td>
+                    <td id="abs_tot_energy" class="abs-val">0.00</td>
+                    <td id="abs_tot_eng_chg" class="abs-val">0.00</td>
+                    <td id="abs_avg_pafm" class="abs-val" style="color:#27ae60;">0.00</td>
+                    <td id="abs_tot_cap_chg" class="abs-val">0.00</td>
+                    <td id="abs_tot_amount" class="abs-val">0.00</td>
+                    <td id="abs_cum_pafm" class="abs-val">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div class="sheet-footer">
+            <button id="btn_edit_abstract" class="btn-sheet-edit" onclick="toggleAbstractEdit()">✏️ Edit Abstract</button>
+            <button class="btn-sheet-save" onclick="saveAbstract()">💾 Save Abstract Data</button>
+            <button class="btn-excel-sheet" onclick="exportCurrentSheet('abstract')">📥 Export Sheet</button>
+        </div>
+    </div>
+    
+    <div class="footer-actions">
+        <button class="btn-action btn-print" onclick="window.print()">🖨️ Print Sheet</button>
+    </div>
+</div>
+
+<div id="dailyModal" class="modal"><div class="modal-content"><div class="pafm-wrapper"><h3 id="modalTitle">Add Daily Shutdown</h3><input type="hidden" id="hiddenDate"><input type="hidden" id="editId"><div class="form-group"><label>Unit</label><select id="dailyUnit"><option value="Unit-1">Unit-1</option><option value="Unit-2">Unit-2</option><option value="Unit-3">Unit-3</option><option value="Unit-4">Unit-4</option></select></div><div class="form-group"><label>From (HH:MM)</label><input type="text" id="dailyStart" placeholder="HH:MM" onblur="formatTimeInput(this)"></div><div class="form-group"><label>To (HH:MM)</label><input type="text" id="dailyEnd" placeholder="HH:MM" onblur="formatTimeInput(this)"></div><div class="form-group"><label>Reason</label><input type="text" id="dailyReason" placeholder="e.g. Tube Leakage"></div><div style="text-align:right;"><button onclick="closeModal()" style="background:#999; color:white; padding:8px;">Cancel</button><button onclick="saveDailyEntry()" class="btn-gen" style="width:auto;">Save</button></div></div></div></div>
+
+<script>
+    // ================= DATA CONFIG =================
+    const data_optcl = [{ sl: 1, name: "UK-Jayanagar Feeder - I", meter: "S.M. Ltd. APEX-100\nOPT00426", mf: 1000, active: true }, { sl: 2, name: "UK-Jayanagar Feeder - II", meter: "S.M. Ltd. APEX-100\nOPT00870", mf: 1000, active: true }, { sl: 3, name: "UK-Theruvalli Feeder - III", meter: "S.M. Ltd. APEX-100\nOPT00663", mf: 1000, active: true }, { sl: 4, name: "Bus-Coupler 220 KV", meter: "S.M. Ltd. APEX-100\nOPT00863", mf: 1000, active: false }, { sl: 5, name: "220/33 KV (7.5 MVA T/F)", meter: "SECURE METER\n1868294", mf: 1500, active: false }];
+    const data_gridco = JSON.parse(JSON.stringify(data_optcl));
+    const data_ohpc = JSON.parse(JSON.stringify(data_optcl));
+    const data_psdf = [{ sl: 1, name: "PSDF FEEDER", meter: "SECURE X1868294", mf: 1000 }];
+    const data_kv11 = [{ sl: 1, name: "11 KV BARINIPUT", meter: "S.M.Ltd ORH-00482", mf: 8000 }];
+    const kv11_regs = ["U -", "r -", "A -"];
+    const data_govt = [{ sl: 1, name: "Generator - I", mf: 1000 }, { sl: 2, name: "Generator - II", mf: 1000 }, { sl: 3, name: "Generator - III", mf: 1000 }, { sl: 4, name: "Generator - IV", mf: 1000 }, { sl: 5, name: "UAB - I", mf: 10 }, { sl: 6, name: "UAB - II", mf: 1000 }, { sl: 7, name: "UAB - III", mf: 1000 }, { sl: 8, name: "UAB - IV", mf: 10 }, { sl: 9, name: "SSB - I", mf: 1000 }, { sl: 10, name: "SSB - II", mf: 1000 }, { sl: 11, name: "Bariniput Feeder", mf: 8000, linked: true }, { sl: 12, name: "DG Reading", mf: 1 }];
+
+    let globalData = [];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    // NEW PAFM LOGIC CONSTANTS
+    const UNIT_CAPACITY = 80; 
+    const PEAK_START_MIN = 1080; 
+    const PEAK_END_MIN = 1260;   
+    const PEAK_DURATION = 180;   
+
+    const STORAGE_KEY = 'UKHEP_FULL_BILL_DB';
+    const PAFM_ARCHIVE_KEY = 'UKHEP_PAFM_ARCHIVE';
+
+    const TAB_ORDER = ['pafm', 'optcl', 'gridco', 'ohpc', 'psdf', 'kv11', 'govt', 'summary', 'netexport', 'billgen', 'abstract'];
+
+    function initDate() {
+        const today = new Date(); today.setMonth(today.getMonth() - 1);
+        const selMonth = document.getElementById('sel_month'); const selYear = document.getElementById('sel_year');
+        const viewMonth = document.getElementById('view_month'); const viewYear = document.getElementById('view_year');
+        monthNames.forEach((m, i) => { const opt = document.createElement('option'); opt.value = i; opt.text = m; selMonth.add(opt); const opt2 = document.createElement('option'); opt2.value = i; opt2.text = m; viewMonth.add(opt2); });
+        const currentYear = new Date().getFullYear();
+        for(let y = currentYear - 2; y <= currentYear + 2; y++) { const opt = document.createElement('option'); opt.value = y; opt.text = y; selYear.add(opt); const opt2 = document.createElement('option'); opt2.value = y; opt2.text = y; viewYear.add(opt2); }
+        selMonth.value = today.getMonth(); selYear.value = today.getFullYear();
+        viewMonth.value = today.getMonth(); viewYear.value = today.getFullYear();
+        updateDateConfig();
+        updateProgress();
+    }
+    
+    function updateDateConfig() {
+        const m = parseInt(document.getElementById('sel_month').value); const y = parseInt(document.getElementById('sel_year').value);
+        document.getElementById('cfg_month').value = monthNames[m]; document.getElementById('cfg_year').value = y;
+        const days = new Date(y, m + 1, 0).getDate(); document.getElementById('cfg_days').value = days;
+        
+        let nextM = m + 1; let nextY = y; if (nextM > 11) { nextM = 0; nextY++; }
+        const formattedDate = `01/${String(nextM + 1).padStart(2, '0')}/${nextY}`;
+        
+        let fyStart, fyEnd, cycleNo;
+        if (m >= 3) { fyStart = y; fyEnd = (y + 1) % 100; cycleNo = m - 2; } 
+        else { fyStart = y - 1; fyEnd = y % 100; cycleNo = m + 10; }
+        
+        const billStr = `${cycleNo}/${fyStart}-${fyEnd} Dtd. ${formattedDate}`;
+        document.getElementById('cfg_billno').value = billStr;
+        
+        const strMonth = String(m + 1).padStart(2, '0');
+        const minDate = `${y}-${strMonth}-01`; const maxDate = `${y}-${strMonth}-${days}`;
+        const startInput = document.getElementById('maintStartDate'); const endInput = document.getElementById('maintEndDate');
+        if(startInput && endInput) { startInput.min = minDate; startInput.max = maxDate; endInput.min = minDate; endInput.max = maxDate; }
+        generateCalendar();
+    }
+
+    function renderStandard(data, id, sheetId) {
+        let html = '';
+        data.forEach((r, i) => {
+            html += `<tr><td rowspan="2" class="guide-arrow-anchor">${r.sl}</td><td rowspan="2">${r.name}</td><td rowspan="2">${r.meter}</td>
+            <td class="export-type">EXP</td><td><input type="number" id="${sheetId}_ei_${i}" oninput="handleInput(this, '${sheetId}_ef_${i}')" onkeydown="moveFocus(event, '${sheetId}_ef_${i}')"></td><td><input type="number" id="${sheetId}_ef_${i}" oninput="handleInput(this)" onkeydown="moveFocus(event, '${sheetId}_ii_${i}')"></td>
+            <td id="${sheetId}_ea_${i}" class="readonly-cell">0</td><td rowspan="2">${r.mf}</td><td id="${sheetId}_een_${i}" class="readonly-cell">0</td><td rowspan="2" id="${sheetId}_net_${i}" class="readonly-cell">0</td></tr>
+            <tr><td class="import-type">IMP</td><td><input type="number" id="${sheetId}_ii_${i}" oninput="handleInput(this, '${sheetId}_if_${i}')" onkeydown="moveFocus(event, '${sheetId}_if_${i}')"></td><td><input type="number" id="${sheetId}_if_${i}" oninput="handleInput(this)" onkeydown="moveFocus(event, '${sheetId}_ei_${i+1}')"></td>
+            <td id="${sheetId}_ia_${i}" class="readonly-cell">0</td><td id="${sheetId}_ien_${i}" class="readonly-cell">0</td></tr>`;
+        });
+        document.getElementById(id).innerHTML = html;
+    }
+    
+    function renderPsdf(data, id) {
+        let html = ''; data.forEach((r, i) => {
+            html += `<tr><td rowspan="2" class="guide-arrow-anchor">${r.sl}</td><td rowspan="2">${r.name}</td><td class="export-type">EXP</td><td><input type="number" id="psdf_ei_${i}" oninput="handleInput(this, 'psdf_ef_${i}')" onkeydown="moveFocus(event, 'psdf_ef_${i}')"></td><td><input type="number" id="psdf_ef_${i}" oninput="handleInput(this)" onkeydown="moveFocus(event, 'psdf_ii_${i}')"></td><td id="psdf_ea_${i}" class="readonly-cell">0</td><td rowspan="2">${r.mf}</td><td id="psdf_een_${i}" class="readonly-cell">0</td></tr><tr><td class="import-type">IMP</td><td><input type="number" id="psdf_ii_${i}" oninput="handleInput(this, 'psdf_if_${i}')" onkeydown="moveFocus(event, 'psdf_if_${i}')"></td><td><input type="number" id="psdf_if_${i}" oninput="handleInput(this)" onkeydown="moveFocus(event, '')"></td><td id="psdf_ia_${i}" class="readonly-cell">0</td><td id="psdf_ien_${i}" class="readonly-cell">0</td></tr>`;
+        }); document.getElementById(id).innerHTML = html;
+    }
+    function renderKv11(data, id) {
+        let html = ''; data.forEach((r, i) => {
+            kv11_regs.forEach((reg, ri) => { html += `<tr>${ri===0?`<td rowspan="3" class="guide-arrow-anchor">${r.sl}</td><td rowspan="3">${r.name}</td>`:''}<td>${reg}</td><td><input type="number" id="kv11_init_${i}_${ri}" oninput="handleInput(this, 'kv11_final_${i}_${ri}')" onkeydown="moveFocus(event, 'kv11_final_${i}_${ri}')"></td><td><input type="number" id="kv11_final_${i}_${ri}" oninput="handleInput(this)" onkeydown="moveFocus(event, 'kv11_init_${i}_${ri+1}')"></td><td id="kv11_adv_${i}_${ri}" class="readonly-cell">0</td>${ri===0?`<td rowspan="3">${r.mf}</td>`:''}<td id="kv11_eng_${i}_${ri}" class="readonly-cell">0</td></tr>`; });
+        }); document.getElementById(id).innerHTML = html;
+    }
+    function renderGovt(data, id) {
+        let html = ''; data.forEach((r, i) => {
+            let extra = ''; if(i==3) extra = `<tr class="subtotal-row"><td colspan="6" style="text-align:right">TOTAL GENERATION:</td><td id="total_gen">0</td></tr>`; if(i==7) extra = `<tr class="subtotal-row"><td colspan="6" style="text-align:right">TOTAL UAB:</td><td id="total_uab">0</td></tr>`;
+            html += `<tr><td class="guide-arrow-anchor">${r.sl}</td><td>${r.name}</td><td><input type="number" id="govt_init_${i}" oninput="handleInput(this, 'govt_final_${i}')" onkeydown="moveFocus(event, 'govt_final_${i}')"></td><td><input type="number" id="govt_final_${i}" oninput="handleInput(this)" onkeydown="moveFocus(event, 'govt_init_${i+1}')"></td><td id="govt_diff_${i}" class="readonly-cell">0</td><td>${r.mf}</td><td id="govt_eng_${i}" class="readonly-cell">0</td></tr>` + extra;
+        }); document.getElementById(id).innerHTML = html;
+    }
+
+    const V = (id) => parseFloat(document.getElementById(id).value) || 0;
+    const T = (id, val) => document.getElementById(id).innerText = val.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+    
+    function handleInput(el, pairId) {
+        checkInputState(el);
+        let initId = null;
+        let finalId = null;
+
+        if (el.id.includes('init') || el.id.includes('_ei_') || el.id.includes('_ii_')) {
+            initId = el.id;
+            if (el.id.includes('_ei_')) finalId = el.id.replace('_ei_', '_ef_');
+            else if (el.id.includes('_ii_')) finalId = el.id.replace('_ii_', '_if_');
+            else if (el.id.includes('init')) finalId = el.id.replace('init', 'final');
+        } else {
+            finalId = el.id;
+            if (el.id.includes('_ef_')) initId = el.id.replace('_ef_', '_ei_');
+            else if (el.id.includes('_if_')) initId = el.id.replace('_if_', '_ii_');
+            else if (el.id.includes('final')) initId = el.id.replace('final', 'init');
+        }
+
+        if (initId && finalId) validatePair(initId, finalId);
+        
+        document.querySelectorAll('.guide-arrow').forEach(e => e.classList.remove('guide-arrow'));
+        const parentTd = el.parentElement;
+        if(parentTd) parentTd.classList.add('guide-arrow');
+
+        const sheet = el.id.split('_')[0];
+        calc(sheet);
+        updateInputHint();
+    }
+
+    function checkInputState(el) { if(el.value.length > 0) el.classList.add('filled'); else el.classList.remove('filled'); }
+    
+    function setValAndEditable(id, val) {
+        const el = document.getElementById(id);
+        if(el) {
+            el.value = val;
+            el.readOnly = true; 
+            checkInputState(el);
+            el.classList.add('editable-locked');
+        }
+    }
+    
+    let sheetLockStates = {};
+    function toggleSheetEdit(sheetId) {
+        const btn = document.querySelector(`#${sheetId} .btn-sheet-edit`);
+        const isUnlocked = sheetLockStates[sheetId] || false;
+
+        if (!isUnlocked) {
+            if(prompt(`Enter Admin Password to Edit ${sheetId.toUpperCase()}:`) === "admin") {
+                const inputs = document.querySelectorAll(`#${sheetId} input:not([type=hidden])`);
+                inputs.forEach(inp => {
+                    if(!inp.classList.contains('locked-field')) {
+                        inp.readOnly = false;
+                        inp.classList.remove('editable-locked');
+                        inp.style.backgroundColor = "#fff";
+                    }
+                });
+                btn.innerText = `🔒 Lock ${sheetId.toUpperCase()}`;
+                btn.classList.add('unlocked');
+                sheetLockStates[sheetId] = true;
+                document.getElementById('btn_bill_update').style.display = 'inline-block';
+            } else {
+                alert("Wrong Password.");
+            }
+        } else {
+            const inputs = document.querySelectorAll(`#${sheetId} input`);
+            inputs.forEach(inp => {
+                inp.readOnly = true;
+                if(inp.value !== "") inp.classList.add('editable-locked');
+            });
+            btn.innerText = `✏️ Edit ${sheetId.toUpperCase()}`;
+            btn.classList.remove('unlocked');
+            sheetLockStates[sheetId] = false;
+        }
+    }
+    
+    let isAbstractUnlocked = false;
+    function toggleAbstractEdit() {
+        const btn = document.getElementById('btn_edit_abstract');
+        if(!isAbstractUnlocked) {
+            if(prompt("Enter Admin Password to Edit Abstract:") === "admin") {
+                const inputs = document.querySelectorAll('#body_abstract input');
+                inputs.forEach(inp => {
+                    inp.readOnly = false;
+                    inp.style.backgroundColor = "#fff";
+                    inp.style.border = "1px solid #3498db";
+                });
+                btn.innerText = "🔒 Lock Abstract";
+                btn.classList.add('unlocked');
+                isAbstractUnlocked = true;
+            } else {
+                alert("Wrong Password.");
+            }
+        } else {
+            const inputs = document.querySelectorAll('#body_abstract input');
+            inputs.forEach(inp => {
+                inp.readOnly = true;
+                inp.style.backgroundColor = "#e9ecef";
+                inp.style.border = "1px solid #bbb";
+            });
+            btn.innerText = "✏️ Edit Abstract";
+            btn.classList.remove('unlocked');
+            isAbstractUnlocked = false;
+        }
+    }
+
+    function setValAndLock(id, val) { 
+        const el=document.getElementById(id); 
+        if(el){
+            el.value=val; 
+            checkInputState(el);
+            el.readOnly = true;
+            el.classList.add('locked-cell');
+        } 
+    }
+
+    function setVal(id, val) { const el=document.getElementById(id); if(el){el.value=val; checkInputState(el);} }
+
+    function validatePair(initId, finalId) {
+        const iEl = document.getElementById(initId);
+        const fEl = document.getElementById(finalId);
+        if(!iEl || !fEl) return;
+        
+        const iVal = parseFloat(iEl.value); 
+        const fVal = parseFloat(fEl.value);
+        
+        if(!isNaN(iVal) && !isNaN(fVal) && fVal < iVal) { 
+            fEl.classList.add('error-input'); 
+            fEl.classList.remove('filled'); 
+        } else { 
+            fEl.classList.remove('error-input'); 
+            if(fEl.value.length > 0) fEl.classList.add('filled'); 
+        }
+        iEl.classList.remove('error-input');
+    }
+
+    function moveFocus(e, nextId) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            const current = e.target;
+            if (current.classList.contains('error-input')) {
+                current.classList.remove('shake-it');
+                void current.offsetWidth; 
+                current.classList.add('shake-it');
+                setTimeout(() => current.focus(), 10);
+                return; 
+            }
+            let targetId = nextId;
+            let targetEl = document.getElementById(targetId);
+            let safety = 0;
+            while (targetEl && (targetEl.value !== "" || targetEl.readOnly) && safety < 20) {
+                const attr = targetEl.getAttribute('onkeydown');
+                if (attr) {
+                    const match = attr.match(/'([^']+)'/);
+                    if (match && match[1]) {
+                        targetId = match[1];
+                        targetEl = document.getElementById(targetId);
+                    } else break;
+                } else break;
+                safety++;
+            }
+            if(targetEl) {
+                targetEl.focus();
+                document.querySelectorAll('.guide-arrow').forEach(e => e.classList.remove('guide-arrow'));
+                if(targetEl.parentElement) targetEl.parentElement.classList.add('guide-arrow');
+            }
+        }
+    }
+
+    function goToNextTab(currentId) {
+        if(document.querySelectorAll('.sheet-content.active .error-input').length > 0) {
+             alert("⚠️ Cannot proceed!\nPlease correct the values highlighted in RED before moving to the next section.");
+             return;
+        }
+
+        if(currentId !== 'ohpc' && currentId !== 'pafm' && currentId !== 'billgen' && currentId !== 'abstract') {
+            const inputs = document.querySelectorAll(`#${currentId} input:not([readonly])`);
+            let hasEmpty = false;
+            for(let i=0; i<inputs.length; i++) {
+                if(inputs[i].value.trim() === "") { hasEmpty = true; break; }
+            }
+            if(hasEmpty) {
+                alert("⚠️ Cannot proceed!\nPlease fill in ALL input boxes in this section.");
+                return;
+            }
+        }
+
+        const idx = TAB_ORDER.indexOf(currentId);
+        if(idx !== -1 && idx < TAB_ORDER.length - 1) {
+            const nextTabId = TAB_ORDER[idx+1];
+            switchTab(nextTabId);
+            setTimeout(() => {
+                const activeSheet = document.getElementById(nextTabId);
+                if(activeSheet) {
+                    const firstInput = activeSheet.querySelector('input:not([readonly]):not([type=hidden])');
+                    if(firstInput) { firstInput.focus(); firstInput.select(); }
+                }
+            }, 100);
+        }
+    }
+
+    function switchTab(id) {
+        const pafmStatus = checkPAFMStatus();
+        const gatekeeperSheets = ['optcl', 'gridco', 'ohpc', 'psdf', 'kv11', 'govt', 'summary', 'netexport', 'billgen']; // Added billgen to lock
+        
+        if (gatekeeperSheets.includes(id) && !pafmStatus) {
+            document.querySelectorAll('.sheet-content').forEach(e=>e.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+            
+            const targetSheet = document.getElementById(id);
+            targetSheet.classList.add('active');
+            targetSheet.classList.add('locked-sheet-overlay'); 
+            
+            document.getElementById('global_warning').style.display = 'block';
+            
+            const tabIdx = TAB_ORDER.indexOf(id);
+            if(tabIdx !== -1) document.querySelectorAll('.tab-btn')[tabIdx].classList.add('active');
+            return; 
+        } else {
+            document.querySelectorAll('.sheet-content').forEach(e=>e.classList.remove('locked-sheet-overlay'));
+            document.getElementById('global_warning').style.display = 'none';
+        }
+
+        if((id === 'netexport' || id === 'billgen') && !validateTabSwitch(id)) return;
+        
+        document.querySelectorAll('.sheet-content').forEach(e=>e.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+        
+        document.getElementById(id).classList.add('active');
+        const tabIdx = TAB_ORDER.indexOf(id);
+        if(tabIdx !== -1) document.querySelectorAll('.tab-btn')[tabIdx].classList.add('active');
+        
+        if(id === 'billgen') calcBill();
+        if(id === 'abstract') renderAbstract();
+        
+        const firstInput = document.querySelector(`#${id} input:not([readonly])`);
+        if(firstInput) firstInput.focus();
+        updateInputHint();
+    }
+
+    function checkPAFMStatus() {
+        const m = parseInt(document.getElementById('sel_month').value);
+        const y = parseInt(document.getElementById('sel_year').value);
+        const archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        const exists = archive.find(r => r.year === y && r.month === m);
+        return !!exists;
+    }
+
+    function validateTabSwitch(targetId) { return true; }
+
+    // DYNAMIC HINT SYSTEM
+    function updateInputHint() {
+        const hintBox = document.getElementById('inputHint');
+        const activeSheet = document.querySelector('.sheet-content.active');
+        
+        if(!activeSheet) return;
+        const sheetId = activeSheet.id;
+
+        // PAFM Hint Logic
+        if(sheetId === 'pafm') {
+            if(!checkPAFMStatus()) {
+               hintBox.innerText = "👉 1. PAFM : Please Finalize PAFM First";
+               hintBox.className = "input-hint";
+            } else {
+               hintBox.innerText = "✅ PAFM Complete! Proceed to next sheet.";
+               hintBox.className = "input-hint ready";
+            }
+            return;
+        }
+
+        if(['billgen', 'netexport', 'abstract'].includes(sheetId)) {
+            hintBox.innerText = "";
+            hintBox.className = "input-hint";
+            return;
+        }
+
+        if(sheetId === 'summary') {
+            const jnrInput = document.getElementById('sum_jayanagar');
+            if(jnrInput && jnrInput.value === "") {
+                hintBox.innerText = "👉 Enter 8. SUMMARY : 33 KV Import from Jayanagar";
+                hintBox.className = "input-hint";
+                return;
+            } else {
+                hintBox.innerText = "✅ Summary Complete! Click 'Save & Next'.";
+                hintBox.className = "input-hint ready";
+                return;
+            }
+        }
+
+        const inputs = activeSheet.querySelectorAll('input:not([readonly]):not([type=hidden])');
+        let nextInput = null;
+
+        for(let i=0; i<inputs.length; i++) {
+            if(inputs[i].value === "") {
+                nextInput = inputs[i];
+                break;
+            }
+        }
+
+        if(nextInput) {
+            const row = nextInput.closest('tr');
+            let rowName = "Value";
+            if(row) {
+                const cells = row.querySelectorAll('td');
+                for(let c=0; c<cells.length; c++) {
+                    if(cells[c].innerText.trim().length > 1 && !cells[c].querySelector('input')) {
+                        rowName = cells[c].innerText.split('\n')[0]; 
+                        break;
+                    }
+                }
+            }
+            
+            let type = "";
+            if(nextInput.id.includes('_ei_')) type = "Initial (EXP)";
+            else if(nextInput.id.includes('_ef_')) type = "Final (EXP)";
+            else if(nextInput.id.includes('_ii_')) type = "Initial (IMP)";
+            else if(nextInput.id.includes('_if_')) type = "Final (IMP)";
+            else if(nextInput.id.includes('init')) type = "Initial";
+            else if(nextInput.id.includes('final')) type = "Final";
+
+            const sheetBtn = document.querySelector(`.tab-btn[onclick="switchTab('${sheetId}')"]`);
+            const sheetName = sheetBtn ? sheetBtn.innerText : sheetId.toUpperCase();
+            
+            hintBox.innerText = `👉 Enter ${sheetName} : ${rowName} ${type}`;
+            hintBox.className = "input-hint";
+        } else {
+            hintBox.innerText = "✅ Sheet Complete! Click 'Save & Next' to proceed.";
+            hintBox.className = "input-hint ready";
+        }
+    }
+
+    function calc(sheet, el) {
+        if(['optcl','gridco','ohpc'].includes(sheet)) {
+            let total = 0; const d = sheet==='optcl'?data_optcl:sheet==='gridco'?data_gridco:data_ohpc;
+            d.forEach((r,i)=>{
+                const ei=V(`${sheet}_ei_${i}`), ef=V(`${sheet}_ef_${i}`), ii=V(`${sheet}_ii_${i}`), ifinal=V(`${sheet}_if_${i}`);
+                const ea=ef-ei, ia=ifinal-ii, een=ea*r.mf, ien=ia*r.mf;
+                
+                let net = 0;
+                if(r.sl === 4) { net = een + ien; } 
+                else if(r.sl === 5) { net = ien; } 
+                else { net = een - ien; }
+
+                T(`${sheet}_ea_${i}`,ea); T(`${sheet}_ia_${i}`,ia); T(`${sheet}_een_${i}`,een); T(`${sheet}_ien_${i}`,ien); T(`${sheet}_net_${i}`,net);
+                if(r.active) total+=net;
+            });
+            T(`total_${sheet}`, total);
+        }
+        if(sheet==='psdf') { data_psdf.forEach((r,i)=>{ const ei=V(`psdf_ei_${i}`), ef=V(`psdf_ef_${i}`), ii=V(`psdf_ii_${i}`), ifinal=V(`psdf_if_${i}`); const ea=ef-ei, ia=ifinal-ii, een=ea*r.mf, ien=ia*r.mf; T(`psdf_ea_${i}`,ea.toFixed(4)); T(`psdf_ia_${i}`,ia.toFixed(4)); T(`psdf_een_${i}`,een); T(`psdf_ien_${i}`,ien); }); }
+        if(sheet==='kv11') { let tot=0, linkI=0, linkF=0; data_kv11.forEach((r,i)=>{ kv11_regs.forEach((reg,ri)=>{ const init=V(`kv11_init_${i}_${ri}`), final=V(`kv11_final_${i}_${ri}`); const adv=(final-init)*1000, eng=(final-init)*r.mf; T(`kv11_adv_${i}_${ri}`,adv); T(`kv11_eng_${i}_${ri}`,eng); if(ri===0) { tot+=eng; linkI=init; linkF=final; } }); }); T('total_kv11', tot); if(document.getElementById('govt_init_10')) { const li=document.getElementById('govt_init_10'), lf=document.getElementById('govt_final_10'); li.value=linkI; lf.value=linkF; if(linkI>0) li.classList.add('filled'); if(linkF>0) lf.classList.add('filled'); calc('govt', null); } }
+        if(sheet==='govt') { let ens=[]; data_govt.forEach((r,i)=>{ const init=V(`govt_init_${i}`), final=V(`govt_final_${i}`); const eng=(final-init)*r.mf; T(`govt_diff_${i}`, final-init); T(`govt_eng_${i}`, eng); ens.push(eng); }); T('total_gen', ens[0]+ens[1]+ens[2]+ens[3]); T('total_uab', ens[4]+ens[5]+ens[6]+ens[7]); }
+        updateSummary(); calcNetExport(); updateProgress();
+    }
+
+    function updateProgress() {
+        const inputs = document.querySelectorAll('.sheet-content:not(#pafm):not(#billgen):not(#netexport) input:not([readonly]):not([type=hidden])');
+        let filled = 0; inputs.forEach(i => { if(i.value !== "") filled++; });
+        const pct = inputs.length > 0 ? Math.round((filled / inputs.length) * 100) : 0;
+        document.querySelector('.progress-bar').style.width = pct + '%';
+        document.getElementById('progressText').innerText = pct + '% Completed';
+    }
+
+    function calcNetExport() {
+        const getKWH=(id)=>parseFloat(document.getElementById(id).innerText.replace(/,/g,''))||0; const getInp=(id)=>parseFloat(document.getElementById(id).value)||0; const setMU=(id, val)=>document.getElementById(id).innerText=val.toFixed(6);
+        const f1=getKWH('optcl_net_0')/1000000; setMU('ne_1',f1); const f2=getKWH('optcl_net_1')/1000000; setMU('ne_2',f2); const f3=getKWH('optcl_net_2')/1000000; setMU('ne_3',f3);
+        const v4=getKWH('psdf_een_0')/1000000; setMU('ne_4',v4); const v5=getInp('sum_jayanagar')/1000000; setMU('ne_5',v5);
+        const v6=v4+v5; setMU('ne_6',v6); const v7=getKWH('kv11_eng_0_0')/1000000; setMU('ne_7',v7);
+        const v8=v7*1.005; setMU('ne_8',v8); const v9=v4-v8; setMU('ne_9',v9); const v10=v9*1.005; setMU('ne_10',v10);
+        const v11=v5; setMU('ne_11',v11); const v12=v11*1.005; setMU('ne_12',v12); const v13=v10+v12; setMU('ne_13',v13);
+        const v14=(f1+f2+f3)-v12; setMU('ne_14',v14);
+    }
+
+    function updateSummary() {
+        const f1=parseFloat(document.getElementById('optcl_net_0').innerText.replace(/,/g,''))||0; const f2=parseFloat(document.getElementById('optcl_net_1').innerText.replace(/,/g,''))||0; const f3=parseFloat(document.getElementById('optcl_net_2').innerText.replace(/,/g,''))||0;
+        document.getElementById('sum_feeder1').value=f1.toLocaleString(); document.getElementById('sum_feeder2').value=f2.toLocaleString(); document.getElementById('sum_feeder3').value=f3.toLocaleString(); document.getElementById('sum_total_export').value=(f1+f2+f3).toLocaleString();
+        document.getElementById('sum_11kv').value=document.getElementById('kv11_eng_0_0').innerText; document.getElementById('sum_psdf').value=document.getElementById('psdf_een_0').innerText;
+        document.getElementById('sum_gen').value=document.getElementById('total_gen').innerText; document.getElementById('sum_uab').value=document.getElementById('total_uab').innerText; document.getElementById('sum_tf220').value=document.getElementById('optcl_net_4').innerText;
+        document.querySelectorAll('#summary input[readonly]').forEach(el=>{ if(el.value!==""&&el.value!=="0"&&el.value!=="0.00") el.classList.add('filled'); });
+        if(document.getElementById('sum_jayanagar').value!=="") calcNetExport();
+    }
+
+    // PAFM LOGIC
+    function formatTimeInput(input){ let val=input.value.trim(); if(!val)return; if(val==="24"||val==="24:00"){input.value="24:00";return;} if(!val.includes(':')){if(val.length<=2)val+=":00";else if(val.length===3)val="0"+val[0]+":"+val.substring(1);else if(val.length===4)val=val.substring(0,2)+":"+val.substring(2);} let[h,m]=val.split(':'); if(!m)m="00"; h=parseInt(h)||0; m=parseInt(m)||0; if(h>24)h=24; if(h===24)m=0; if(m>59)m=59; input.value=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
+    function timeToMin(s){ if(!s)return 0; let[h,m]=s.split(':').map(Number); return h*60+m; }
+    
+    function generateCalendar() {
+        const m=parseInt(document.getElementById('sel_month').value), y=parseInt(document.getElementById('sel_year').value);
+        const grid=document.getElementById('calGrid'); grid.innerHTML=""; document.getElementById('calTitle').innerText=`${monthNames[m]} ${y}`;
+        document.getElementById('calendarBox').style.display='block'; document.getElementById('maintPanel').style.display='block';
+        for(let i=0;i<new Date(y,m,1).getDay();i++) grid.innerHTML+=`<div class="day-cell" style="background:#f9f9f9;"></div>`;
+        for(let d=1;d<=new Date(y,m+1,0).getDate();d++) {
+            let c=document.createElement('div'); c.className='day-cell'; c.id=`day-${d}`; c.innerHTML=`<div class="day-number">${d}</div><div class="event-list" id="events-${d}"></div>`; c.onclick=()=>openDailyModal(y,m,d); grid.appendChild(c);
+        }
+        updateLogTable(); updateCalendarVisuals();
+    }
+
+    function getMaintDayTimes(curr, startD, endD, sMin, eMin) {
+        let s = 0, e = 1440;
+        if(curr.getTime() === startD.getTime()) s = sMin;
+        if(curr.getTime() === endD.getTime()) e = eMin;
+        return { start: s, end: e };
+    }
+    
+    function applyMaintenance() {
+        const uSel=document.getElementById('maintUnit'); if(uSel.options.length===0){alert("No units");return;}
+        const typ=document.getElementById('maintType').value, unit=uSel.value, d1=document.getElementById('maintStartDate').value, t1=document.getElementById('maintStartTime').value, d2=document.getElementById('maintEndDate').value, t2=document.getElementById('maintEndTime').value;
+        if(!d1||!t1||!d2||!t2){alert("Enter all");return;} const start=new Date(d1), end=new Date(d2); if(start>end){alert("Invalid dates");return;}
+        
+        const sMin=timeToMin(t1), eMin=timeToMin(t2); 
+        uSel.remove(uSel.selectedIndex);
+        
+        let loop=new Date(start); loop.setHours(0,0,0,0);
+        while(loop<=end) {
+            const dt=getISODate(loop); 
+            const times = getMaintDayTimes(loop, start, end, sMin, eMin);
+            
+            let loss=0, os=Math.max(times.start, PEAK_START_MIN), oe=Math.min(times.end, PEAK_END_MIN); 
+            if(os<oe) loss=oe-os;
+
+            globalData.push({
+                id:Date.now()+Math.random(), 
+                date:dt, 
+                unit:unit, 
+                reason:typ, 
+                timeStr:`${formatTimeStr(times.start)}-${formatTimeStr(times.end)}`, 
+                startMin:times.start, 
+                endMin:times.end, 
+                loss:loss, 
+                isMaint:true,
+                isFullPeakOutage: (loss === 180) 
+            });
+            loop.setDate(loop.getDate()+1);
+        }
+        updateLogTable(); updateCalendarVisuals(); alert("Maintenance Applied");
+    }
+
+    function openDailyModal(y,m,d){ const dt=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; document.getElementById('hiddenDate').value=dt; document.getElementById('editId').value=""; document.getElementById('modalTitle').innerText=`Add Shutdown (${dt})`; document.getElementById('dailyStart').value=""; document.getElementById('dailyEnd').value=""; document.getElementById('dailyReason').value=""; document.getElementById('dailyModal').style.display='flex'; }
+    function closeModal(){ document.getElementById('dailyModal').style.display='none'; }
+    
+    function saveDailyEntry() {
+        const id=document.getElementById('editId').value, dt=document.getElementById('hiddenDate').value, u=document.getElementById('dailyUnit').value, ts=document.getElementById('dailyStart').value, te=document.getElementById('dailyEnd').value, r=document.getElementById('dailyReason').value||"Manual";
+        if(!ts||!te){alert("Enter time");return;} const s=timeToMin(ts), e=timeToMin(te); if(s>=e){alert("Invalid time");return;}
+        
+        let loss=0, os=Math.max(s,PEAK_START_MIN), oe=Math.min(e,PEAK_END_MIN); 
+        if(os<oe) loss=oe-os;
+
+        const entry={
+            id:id?parseFloat(id):Date.now(), 
+            date:dt, 
+            unit:u, 
+            reason:r, 
+            timeStr:`${ts}-${te}`, 
+            startMin:s, 
+            endMin:e, 
+            loss:loss, 
+            isMaint:false,
+            isFullPeakOutage: false 
+        };
+        
+        if(id){const idx=globalData.findIndex(x=>x.id==id);if(idx!==-1)globalData[idx]=entry;}else globalData.push(entry);
+        updateLogTable(); updateCalendarVisuals(); closeModal();
+    }
+    
+    function updateCalendarVisuals(){ document.querySelectorAll('.event-list').forEach(e=>e.innerHTML=''); globalData.forEach(i=>{ const d=parseInt(i.date.split('-')[2]), c=document.getElementById(`events-${d}`); if(c) c.innerHTML+=`<div class="cal-event ${i.isMaint?'maint-event':''}">${i.unit} ${i.timeStr}</div>`; }); }
+    function updateLogTable(){ 
+        const b=document.getElementById('logBody'); b.innerHTML=""; globalData.sort((a,b)=>new Date(a.date)-new Date(b.date)); 
+        if(globalData.length>0){
+            document.getElementById('logSection').style.display='block'; 
+            globalData.forEach(i=>{ 
+                let status = i.isFullPeakOutage ? "Planned (Cap Reduced)" : `Forced (Loss: ${i.loss}m)`;
+                if(!i.isMaint && i.loss > 0) status = `Forced (Loss: ${i.loss}m)`;
+                b.innerHTML+=`<tr><td>${i.date}</td><td>${i.unit}</td><td>${i.reason}</td><td>${i.timeStr}</td><td style="color:${i.loss>0?'red':'green'}">${i.startMin}</td><td>${i.endMin}</td><td>${status}</td><td><button class="btn-sm btn-del" onclick="deleteEntry(${i.id})">Del</button></td></tr>`; 
+            }); 
+        } 
+    }
+    function deleteEntry(id){ if(prompt("Pass:")==="admin"){globalData=globalData.filter(i=>i.id!==id);updateLogTable();updateCalendarVisuals();} }
+
+    function calculateFinalSheet() {
+        const m=parseInt(document.getElementById('sel_month').value), y=parseInt(document.getElementById('sel_year').value), dim=new Date(y,m+1,0).getDate(), tb=document.getElementById('finalBody');
+        tb.innerHTML=""; document.getElementById('finalSection').style.display='block';
+        
+        let sumIC = 0, sumDCi = 0;
+
+        for(let d=1;d<=dim;d++) {
+            const dt=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, logs=globalData.filter(x=>x.date===dt);
+            
+            // 1. Determine IC
+            let activeUnits = 4;
+            const plannedLogs = logs.filter(l => l.isMaint && l.isFullPeakOutage);
+            const plannedUnitsCount = new Set(plannedLogs.map(l => l.unit)).size;
+            activeUnits = 4 - plannedUnitsCount;
+            if(activeUnits < 0) activeUnits = 0;
+            const dailyIC = activeUnits * UNIT_CAPACITY;
+            const maxMinutes = activeUnits * PEAK_DURATION;
+
+            // 2. Calculate Loss (Forced)
+            const forcedLogs = logs.filter(l => !(l.isMaint && l.isFullPeakOutage));
+            let totalLoss = forcedLogs.reduce((acc, curr) => acc + curr.loss, 0);
+
+            // 3. Availability
+            let totalAvail = maxMinutes - totalLoss;
+            if(totalAvail < 0) totalAvail = 0;
+
+            // 4. DCi
+            let DCi = 0;
+            if(maxMinutes > 0) { DCi = (totalAvail / maxMinutes) * dailyIC * 0.99; } else { DCi = 0; }
+
+            sumIC += dailyIC;
+            sumDCi += DCi;
+
+            let uTxt = logs.length ? logs.map(l=>l.unit).join('<br>') : "-";
+            let tTxt = logs.length ? logs.map(l=>l.timeStr).join('<br>') : "-";
+            let rTxt = logs.length ? logs.map(l=>l.reason).join('<br>') : "-";
+            
+            tb.innerHTML+=`<tr><td>${dt}</td><td>${dailyIC}</td><td>${DCi.toFixed(4)}</td><td>${uTxt}</td><td>${tTxt}</td><td>${rTxt}</td></tr>`;
+        }
+        document.getElementById('totalIC').innerText=sumIC.toFixed(2); document.getElementById('totalDCi').innerText=sumDCi.toFixed(2);
+        
+        let pafm = 0;
+        if(sumIC > 0) { pafm = (10000 * sumDCi) / (sumIC * 99); }
+        document.getElementById('pafmValue').innerText=pafm.toFixed(7);
+        
+        document.getElementById('finalSection').scrollIntoView({behavior:'smooth'});
+    }
+
+    function calcBill() {
+        const billNo = document.getElementById('cfg_billno').value;
+        const daysInMonth = parseFloat(document.getElementById('cfg_days').value) || 0;
+        const arr = parseFloat(document.getElementById('cfg_arr').value) || 0;
+        const annCap = parseFloat(document.getElementById('cfg_cap').value) || 0;
+        const annEng = parseFloat(document.getElementById('cfg_eng').value) || 0;
+        const rate = parseFloat(document.getElementById('cfg_rate').value) || 0;
+        const napaf = parseFloat(document.getElementById('cfg_napaf').value) || 0;
+        const netExportMU = parseFloat(document.getElementById('ne_14').innerText) || 0;
+        
+        let pafmVal = 0, sumDCi = 0, sumIC = 0;
+
+        const m = parseInt(document.getElementById('sel_month').value);
+        const y = parseInt(document.getElementById('sel_year').value);
+        const archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        const savedRec = archive.find(r => r.year === y && r.month === m);
+
+        if (globalData.length > 0) {
+             pafmVal = parseFloat(document.getElementById('pafmValue').innerText) || 0;
+             sumDCi = parseFloat(document.getElementById('totalDCi').innerText) || 0;
+             sumIC = parseFloat(document.getElementById('totalIC').innerText) || 0;
+        } else {
+             pafmVal = 0; sumDCi = 0; sumIC = 0;
+        }
+
+        document.getElementById('bill_no_display').innerText = billNo;
+        document.getElementById('bill_date_display').innerText = new Date().toLocaleDateString();
+        document.getElementById('bill_arr').innerText = arr.toFixed(3);
+        document.getElementById('bill_annual_cap').innerText = annCap.toFixed(3);
+        document.getElementById('bill_annual_eng').innerText = annEng.toFixed(3);
+        document.getElementById('bill_rate').innerText = rate.toFixed(3);
+        document.getElementById('bill_napaf').innerText = napaf.toFixed(2);
+        document.getElementById('bill_exbus').innerText = netExportMU.toFixed(6);
+        
+        document.getElementById('bill_sum_dci').innerText = sumDCi.toFixed(2);
+        document.getElementById('bill_sum_ic').innerText = sumIC.toFixed(2);
+        document.getElementById('bill_pafm').innerText = pafmVal.toFixed(7);
+        
+        const engCharge = (netExportMU * rate) / 1000;
+        document.getElementById('bill_eng_chg').innerText = engCharge.toFixed(7);
+        const ndy = 365;
+        document.getElementById('bill_cap_chg').innerText = 0; 
+        let capCharge = 0; if(ndy * napaf !== 0) capCharge = (annCap * daysInMonth * pafmVal) / (ndy * napaf);
+        document.getElementById('bill_cap_chg').innerText = capCharge.toFixed(7);
+        const totalBill = engCharge + capCharge;
+        document.getElementById('bill_total').innerText = totalBill.toFixed(7);
+        document.getElementById('bill_words').innerText = convertCroresToWords(totalBill);
+    }
+
+    function convertCroresToWords(numCrores) {
+        if(numCrores === 0) return "Zero";
+        const totalRupees = Math.floor(numCrores * 10000000); 
+        return numberToWords(totalRupees);
+    }
+
+    function numberToWords(n) {
+        const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+        const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+        if ((n = n.toString()).length > 9) return 'Overflow';
+        const n_array = ('000000000' + n).slice(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n_array) return; 
+        let str = '';
+        str += (n_array[1] != 0) ? (a[Number(n_array[1])] || b[n_array[1][0]] + ' ' + a[n_array[1][1]]) + 'Crore ' : '';
+        str += (n_array[2] != 0) ? (a[Number(n_array[2])] || b[n_array[2][0]] + ' ' + a[n_array[2][1]]) + 'Lakh ' : '';
+        str += (n_array[3] != 0) ? (a[Number(n_array[3])] || b[n_array[3][0]] + ' ' + a[n_array[3][1]]) + 'Thousand ' : '';
+        str += (n_array[4] != 0) ? (a[Number(n_array[4])] || b[n_array[4][0]] + ' ' + a[n_array[4][1]]) + 'Hundred ' : '';
+        str += (n_array[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_array[5])] || b[n_array[5][0]] + ' ' + a[n_array[5][1]]) : '';
+        return str.trim();
+    }
+
+    // ================= NEW: ABSTRACT LOGIC =================
+    function renderAbstract() {
+        const fyStr = document.getElementById('cfg_fyear').value || "2025-26";
+        const fyStartYear = parseInt(fyStr.split('-')[0]);
+        document.getElementById('abs_header').innerText = `ABSTRACT OF BILLING FOR FY ${fyStr}`;
+
+        const fyOrder = [
+            {m:3, y:fyStartYear}, {m:4, y:fyStartYear}, {m:5, y:fyStartYear}, 
+            {m:6, y:fyStartYear}, {m:7, y:fyStartYear}, {m:8, y:fyStartYear}, 
+            {m:9, y:fyStartYear}, {m:10, y:fyStartYear}, {m:11, y:fyStartYear}, 
+            {m:0, y:fyStartYear+1}, {m:1, y:fyStartYear+1}, {m:2, y:fyStartYear+1}
+        ];
+
+        const tbody = document.getElementById('body_abstract');
+        tbody.innerHTML = "";
+
+        let sumEnergy = 0, sumEngChg = 0, sumCapChg = 0, sumTotal = 0;
+        let weightedPafmNum = 0; 
+        let weightedPafmDenom = 0; 
+
+        fyOrder.forEach((item, index) => {
+            const key = `BILL_DATA_${item.y}_${item.m}`;
+            const storedRaw = localStorage.getItem(key);
+            
+            let netExportMU = 0, engCharge = 0, pafm = 0, capCharge = 0, totalAmt = 0, days = 0;
+            let loaded = false;
+
+            if (storedRaw) {
+                let versions = JSON.parse(storedRaw);
+                if (!Array.isArray(versions)) versions = [versions];
+                const data = versions[versions.length - 1]; 
+                
+                days = parseInt(data.inputs['cfg_days']) || 0;
+                
+                const getVal = (id) => parseFloat((data.inputs[id] || "0").replace(/,/g,'')) || 0;
+                
+                const f1 = getVal('sum_feeder1');
+                const f2 = getVal('sum_feeder2');
+                const f3 = getVal('sum_feeder3');
+                const sumExport = f1 + f2 + f3;
+                
+                const psdfExp = getVal('sum_psdf');
+                const jnrImp = getVal('sum_jayanagar');
+                const kv11 = getVal('sum_11kv');
+                
+                const v4 = psdfExp / 1000000; 
+                const v5 = jnrImp / 1000000;
+                const v7 = kv11 / 1000000;
+                const v8 = v7 * 1.005; 
+                const v9 = v4 - v8; 
+                const v10 = v9 * 1.005;
+                const v11 = v5; 
+                const v12 = v11 * 1.005;
+                
+                const grossExportMU = sumExport / 1000000;
+                netExportMU = grossExportMU - v12; 
+                
+                const archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+                const pafmRec = archive.find(r => r.year === item.y && r.month === item.m);
+                
+                if (pafmRec) pafm = parseFloat(pafmRec.val);
+                
+                const rate = parseFloat(data.inputs['cfg_rate']) || 49.245;
+                const annCap = parseFloat(data.inputs['cfg_cap']) || 40.562;
+                const napaf = parseFloat(data.inputs['cfg_napaf']) || 87;
+                
+                engCharge = (netExportMU * rate) / 1000; 
+                
+                if (napaf !== 0) capCharge = (annCap * days * pafm) / (365 * napaf);
+                
+                totalAmt = engCharge + capCharge;
+                loaded = true;
+            }
+
+            if (loaded && days > 0) {
+                weightedPafmNum += (pafm * days);
+                weightedPafmDenom += days;
+            }
+            
+            const cumPafm = weightedPafmDenom > 0 ? (weightedPafmNum / weightedPafmDenom) : 0;
+
+            if (loaded) {
+                sumEnergy += netExportMU;
+                sumEngChg += engCharge;
+                sumCapChg += capCharge;
+                sumTotal += totalAmt;
+            }
+
+            const monthStr = `${monthNames[item.m]} ${item.y}`;
+            
+            tbody.innerHTML += `
+            <tr>
+                <td>${monthStr}</td>
+                <td><input type="number" id="abs_ene_${index}" value="${loaded ? netExportMU.toFixed(8) : ''}" readonly oninput="recalcAbstract()"></td>
+                <td><input type="number" id="abs_ec_${index}" value="${loaded ? engCharge.toFixed(8) : ''}" readonly oninput="recalcAbstract()"></td>
+                <td><input type="number" id="abs_pafm_${index}" value="${loaded ? pafm.toFixed(8) : ''}" readonly oninput="recalcAbstract()"></td>
+                <td><input type="number" id="abs_cc_${index}" value="${loaded ? capCharge.toFixed(8) : ''}" readonly oninput="recalcAbstract()"></td>
+                <td><input type="number" id="abs_tot_${index}" value="${loaded ? totalAmt.toFixed(8) : ''}" readonly oninput="recalcAbstract()"></td>
+                <td class="abs-val" id="abs_cum_${index}">${loaded ? cumPafm.toFixed(8) : '-'} %</td>
+                <input type="hidden" id="abs_days_${index}" value="${loaded ? days : 30}"> </tr>`;
+        });
+
+        updateAbstractFooter(sumEnergy, sumEngChg, sumCapChg, sumTotal, weightedPafmNum, weightedPafmDenom);
+    }
+
+    function recalcAbstract() {
+        let sumEnergy = 0, sumEngChg = 0, sumCapChg = 0, sumTotal = 0;
+        let weightedPafmNum = 0, weightedPafmDenom = 0;
+
+        for (let i = 0; i < 12; i++) {
+            const ene = parseFloat(document.getElementById(`abs_ene_${i}`).value) || 0;
+            const ec = parseFloat(document.getElementById(`abs_ec_${i}`).value) || 0;
+            const pafm = parseFloat(document.getElementById(`abs_pafm_${i}`).value) || 0;
+            const cc = parseFloat(document.getElementById(`abs_cc_${i}`).value) || 0;
+            const tot = parseFloat(document.getElementById(`abs_tot_${i}`).value) || 0;
+            const days = parseFloat(document.getElementById(`abs_days_${i}`).value) || 30;
+
+            if (ene || ec || pafm || cc || tot) {
+                sumEnergy += ene;
+                sumEngChg += ec;
+                sumCapChg += cc;
+                sumTotal += tot;
+                
+                weightedPafmNum += (pafm * days);
+                weightedPafmDenom += days;
+                
+                const cum = weightedPafmDenom > 0 ? (weightedPafmNum / weightedPafmDenom) : 0;
+                document.getElementById(`abs_cum_${i}`).innerText = cum.toFixed(8) + " %";
+            }
+        }
+        updateAbstractFooter(sumEnergy, sumEngChg, sumCapChg, sumTotal, weightedPafmNum, weightedPafmDenom);
+    }
+
+    function updateAbstractFooter(e, ec, cc, tot, wNum, wDenom) {
+        const avgPafm = wDenom > 0 ? (wNum / wDenom) : 0;
+        document.getElementById('abs_tot_energy').innerText = e.toFixed(8);
+        document.getElementById('abs_tot_eng_chg').innerText = ec.toFixed(8);
+        document.getElementById('abs_avg_pafm').innerText = avgPafm.toFixed(8) + " %";
+        document.getElementById('abs_tot_cap_chg').innerText = cc.toFixed(8);
+        document.getElementById('abs_tot_amount').innerText = tot.toFixed(8);
+    }
+    
+    function saveAbstract() {
+         if(confirm("Are you sure you want to save the Abstract Data?")) {
+             alert("Abstract Data Saved Successfully!");
+         }
+    }
+
+    // ================= BACKUP & RESTORE =================
+    function backupDatabase() {
+        if(!confirm("Download full database backup?")) return;
+        
+        const backup = {
+            bills: {},
+            pafm: JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]")
+        };
+        
+        for(let i=0; i<localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if(key.startsWith('BILL_DATA_')) {
+                backup.bills[key] = JSON.parse(localStorage.getItem(key));
+            }
+        }
+        
+        const blob = new Blob([JSON.stringify(backup, null, 2)], {type : 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `UKHEP_Backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    function triggerRestore() {
+        document.getElementById('restoreFile').click();
+    }
+
+    function restoreDatabase(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if(data.bills && data.pafm) {
+                    if(confirm("⚠️ WARNING: This will overwrite current data. Continue?")) {
+                        // Clear current bill data
+                        localStorage.clear();
+                        
+                        // Restore
+                        localStorage.setItem(PAFM_ARCHIVE_KEY, JSON.stringify(data.pafm));
+                        for(const [key, val] of Object.entries(data.bills)) {
+                            localStorage.setItem(key, JSON.stringify(val));
+                        }
+                        
+                        alert("✅ Database Restored Successfully! Reloading...");
+                        location.reload();
+                    }
+                } else {
+                    alert("❌ Invalid Backup File Format");
+                }
+            } catch(err) {
+                alert("❌ Error reading file: " + err);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ================= EXPORT FUNCTIONS =================
+    function exportCurrentSheet(sheetId) {
+        if (!sheetId) {
+            const activeSheet = document.querySelector('.sheet-content.active');
+            if (activeSheet) sheetId = activeSheet.id;
+            else return; 
+        }
+
+        const sheetDiv = document.getElementById(sheetId);
+        const table = sheetDiv.querySelector('table');
+        
+        if (!table) {
+            alert("No data table found in this sheet to export.");
+            return;
+        }
+
+        const wb = XLSX.utils.table_to_book(table, {sheet: sheetId.toUpperCase()});
+        const m = document.getElementById('cfg_month').value;
+        const y = document.getElementById('cfg_year').value;
+        const filename = `${sheetId.toUpperCase()}_${m}_${y}.xlsx`;
+
+        XLSX.writeFile(wb, filename);
+    }
+
+    function exportWorkbook() {
+        const wb = XLSX.utils.book_new();
+        const m = document.getElementById('cfg_month').value;
+        const y = document.getElementById('cfg_year').value;
+
+        const sheets = ['pafm', 'optcl', 'gridco', 'ohpc', 'psdf', 'kv11', 'govt', 'summary', 'netexport', 'billgen', 'abstract'];
+        
+        let hasData = false;
+
+        sheets.forEach(id => {
+            const div = document.getElementById(id);
+            const table = div.querySelector('table');
+            if (table) {
+                const ws = XLSX.utils.table_to_sheet(table);
+                XLSX.utils.book_append_sheet(wb, ws, id.toUpperCase());
+                hasData = true;
+            }
+        });
+
+        if (!hasData) {
+            alert("No data to export.");
+            return;
+        }
+
+        XLSX.writeFile(wb, `UKHEP_BILLING_${m}_${y}.xlsx`);
+    }
+
+    // ================= STORAGE LOGIC =================
+    function createNewBill() {
+        const selM = parseInt(document.getElementById('sel_month').value);
+        const selY = parseInt(document.getElementById('sel_year').value);
+        
+        const currentKey = `BILL_DATA_${selY}_${selM}`;
+        if(localStorage.getItem(currentKey)) {
+             if(!confirm(`⚠️ WARNING: A bill for ${monthNames[selM]} ${selY} already exists!\n\nDo you want to OVERWRITE it?`)) return;
+             if(prompt("Enter Admin Password to Overwrite:") !== "admin") {
+                 alert("❌ Wrong Password! Action Cancelled.");
+                 return;
+             }
+        }
+
+        document.querySelectorAll('input').forEach(el => {
+            if(!el.classList.contains('config-input')) {
+                el.value = "";
+                el.readOnly = false; 
+                el.classList.remove('filled', 'error-input', 'locked-cell', 'locked-field', 'editable-locked', 'diff-highlight');
+                el.style.backgroundColor = ""; 
+                el.removeAttribute('onclick'); 
+            }
+        });
+        
+        document.querySelectorAll('.locked-cell, .editable-locked').forEach(el => {
+             el.value = "";
+             el.classList.remove('filled', 'error-input', 'locked-cell', 'editable-locked', 'diff-highlight');
+             el.readOnly = false;
+             el.removeAttribute('onclick');
+        });
+        
+        document.getElementById('btn_bill_update').style.display = 'none';
+
+        globalData = []; 
+
+        let prevM = selM - 1; let prevY = selY;
+        if (prevM < 0) { prevM = 11; prevY = selY - 1; }
+        
+        const prevKey = `BILL_DATA_${prevY}_${prevM}`;
+        const rawPrev = localStorage.getItem(prevKey);
+
+        if(rawPrev) {
+            let prevVersions = JSON.parse(rawPrev);
+            if(!Array.isArray(prevVersions)) prevVersions = [prevVersions];
+            const prevData = prevVersions[prevVersions.length-1].inputs; 
+
+            ['optcl','gridco','ohpc'].forEach(sheet => {
+                for(let i=0; i<5; i++) {
+                    if(prevData[`${sheet}_ef_${i}`]) setValAndLock(`${sheet}_ei_${i}`, prevData[`${sheet}_ef_${i}`]);
+                    if(prevData[`${sheet}_if_${i}`]) setValAndLock(`${sheet}_ii_${i}`, prevData[`${sheet}_if_${i}`]);
+                }
+            });
+            for(let i=0; i<1; i++) {
+                if(prevData[`psdf_ef_${i}`]) setValAndLock(`psdf_ei_${i}`, prevData[`psdf_ef_${i}`]);
+                if(prevData[`psdf_if_${i}`]) setValAndLock(`psdf_ii_${i}`, prevData[`psdf_if_${i}`]);
+            }
+            for(let i=0; i<12; i++) {
+                if(prevData[`govt_final_${i}`]) setValAndLock(`govt_init_${i}`, prevData[`govt_final_${i}`]);
+            }
+            for(let i=0; i<1; i++) {
+               kv11_regs.forEach((r, ri) => {
+                   if(prevData[`kv11_final_${i}_${ri}`]) setValAndLock(`kv11_init_${i}_${ri}`, prevData[`kv11_final_${i}_${ri}`]);
+               });
+            }
+            alert(`Fresh Bill Created for ${monthNames[selM]} ${selY}.\nReadings auto-filled and LOCKED.`);
+        } else {
+            alert(`Fresh Bill Created for ${monthNames[selM]} ${selY}.\nNo previous bill found to auto-fill.`);
+        }
+        
+        calc('optcl', null);
+        generateCalendar();
+        updateProgress();
+        updateInputHint(); // Force hint update immediately
+    }
+
+    function saveWithValidation(requirePassword, isUpdate) {
+        const errors = document.querySelectorAll('.error-input');
+        if (errors.length > 0) {
+            alert("⚠️ Saving Prevented!\n\nFinal Reading cannot be less than Initial Reading (Advance must be ≥ 0).\nPlease correct the fields highlighted in RED.");
+            errors[0].scrollIntoView({behavior: "smooth", block: "center"});
+            return false;
+        }
+
+        if (requirePassword) {
+            if(isUpdate) {
+                if(!confirm("Are you sure you want to Update this bill?")) return false;
+            }
+            const pwd = prompt("Enter Admin Password to Save/Update Bill:");
+            if (pwd !== "admin") {
+                alert("❌ Wrong Password! Action Cancelled.");
+                return false;
+            }
+        }
+
+        saveFullBill(isUpdate);
+        return true;
+    }
+
+    function saveFullBill(isUpdate) {
+        const m = document.getElementById('sel_month').value;
+        const y = document.getElementById('sel_year').value;
+        const key = `BILL_DATA_${y}_${m}`;
+        
+        let versions = [];
+        if(localStorage.getItem(key)) {
+            versions = JSON.parse(localStorage.getItem(key));
+            if(!Array.isArray(versions)) versions = [versions]; 
+        }
+
+        const inputs = {};
+        document.querySelectorAll('input, select').forEach(el => { if(el.id) inputs[el.id] = el.value; });
+        document.querySelectorAll('span[id^="bill_"]').forEach(el => { inputs[el.id] = el.innerText; });
+
+        let newVersionName = "Original";
+        if (versions.length > 0) {
+             newVersionName = `Update-${versions.length} (${new Date().toLocaleDateString()})`;
+        }
+
+        const saveData = {
+            versionName: newVersionName,
+            inputs: inputs,
+            pafmData: JSON.parse(JSON.stringify(globalData)),
+            savedAt: new Date().toLocaleString()
+        };
+
+        versions.push(saveData);
+        localStorage.setItem(key, JSON.stringify(versions));
+        document.getElementById('btn_bill_update').style.display = 'none';
+        alert(`Bill Saved! Version: ${newVersionName}`);
+        
+        if(document.getElementById('view_month').value == m && document.getElementById('view_year').value == y) {
+            checkForVersions();
+        }
+    }
+
+    function checkForVersions() {
+        const m = document.getElementById('view_month').value;
+        const y = document.getElementById('view_year').value;
+        const key = `BILL_DATA_${y}_${m}`;
+        const verSelect = document.getElementById('view_version');
+        const btnDel = document.getElementById('btn_delete_version');
+        verSelect.innerHTML = ""; verSelect.style.display = 'none';
+        btnDel.style.display = 'none';
+
+        const dataStr = localStorage.getItem(key);
+        if(dataStr) {
+            let versions = JSON.parse(dataStr);
+            if(!Array.isArray(versions)) versions = [versions];
+            if(versions.length > 0) {
+                versions.forEach((v, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.text = v.versionName || (idx === 0 ? "Original" : `Edit ${idx}`);
+                    verSelect.add(opt);
+                });
+                verSelect.style.display = 'inline-block';
+                verSelect.selectedIndex = versions.length - 1; 
+                btnDel.style.display = 'inline-block'; 
+            }
+        }
+    }
+    
+    function deleteCurrentVersion() {
+        const password = prompt("Enter Admin Password to DELETE this version:");
+        if (password !== "admin") {
+            alert("Wrong Password! Delete cancelled.");
+            return;
+        }
+
+        const m = document.getElementById('view_month').value;
+        const y = document.getElementById('view_year').value;
+        const key = `BILL_DATA_${y}_${m}`;
+        const dataStr = localStorage.getItem(key);
+        
+        if (!dataStr) return;
+
+        let versions = JSON.parse(dataStr);
+        if(!Array.isArray(versions)) versions = [versions];
+
+        const selectedIdx = document.getElementById('view_version').selectedIndex;
+        
+        if (selectedIdx > -1) {
+            const removed = versions.splice(selectedIdx, 1); 
+            
+            if (versions.length === 0) {
+                localStorage.removeItem(key);
+                alert("All versions deleted. Month data cleared.");
+                
+                document.querySelectorAll('input').forEach(el => {
+                    if(!el.readOnly && !el.classList.contains('config-input')) el.value = "";
+                });
+                document.getElementById('view_version').style.display = 'none';
+                document.getElementById('btn_delete_version').style.display = 'none';
+                
+            } else {
+                localStorage.setItem(key, JSON.stringify(versions));
+                alert(`Version deleted. ${versions.length} versions remaining.`);
+                checkForVersions(); 
+                loadPreviousBill(); 
+            }
+        }
+    }
+
+    function loadPreviousBill() {
+        const m = document.getElementById('view_month').value;
+        const y = document.getElementById('view_year').value;
+        const key = `BILL_DATA_${y}_${m}`;
+        const dataStr = localStorage.getItem(key);
+
+        if(!dataStr) { alert("No saved bill found."); return; }
+
+        let versions = JSON.parse(dataStr);
+        if(!Array.isArray(versions)) versions = [versions];
+        
+        const selectedIdx = document.getElementById('view_version').selectedIndex;
+        const safeIdx = (selectedIdx > -1 && selectedIdx < versions.length) ? selectedIdx : versions.length - 1;
+        const data = versions[safeIdx];
+
+        globalData = JSON.parse(JSON.stringify(data.pafmData || []));
+        
+        document.getElementById('sel_month').value = m; document.getElementById('sel_year').value = y;
+        updateDateConfig(); 
+
+        document.querySelectorAll('.diff-highlight').forEach(el => el.classList.remove('diff-highlight'));
+
+        for(const [id, val] of Object.entries(data.inputs)) {
+            const el = document.getElementById(id);
+            if(el) {
+                if(el.tagName === "INPUT") {
+                    setValAndEditable(id, val);
+                } else {
+                    el.innerText = val; 
+                }
+            }
+        }
+
+        if (safeIdx > 0 && versions.length > 1) {
+            const originalData = versions[0].inputs;
+            for(const [id, val] of Object.entries(data.inputs)) {
+                const el = document.getElementById(id);
+                if(el && el.tagName === "INPUT" && originalData[id] !== undefined) {
+                    if(String(val) !== String(originalData[id])) {
+                        el.classList.add('diff-highlight');
+                    }
+                }
+            }
+        }
+        
+        if(globalData.length > 0) calculateFinalSheet();
+        calc('optcl');
+        calc('gridco');
+        calc('ohpc');
+        calc('psdf');
+        calc('kv11');
+        calc('govt');
+        calcBill();
+
+        document.getElementById('btn_bill_update').style.display = 'none';
+        
+        alert(`Loaded: ${monthNames[m]} ${y} (${data.versionName || "Original"}).\nData recalculated fresh from saved inputs.`);
+    }
+
+    function enableEditMode(){ 
+        if(prompt("Enter Admin Password to Edit:")==="admin"){ 
+            document.querySelectorAll('input').forEach(i=>{
+                if(i.id!=='cfg_month'&&i.id!=='cfg_year'&&i.id!=='cfg_days'){
+                    i.readOnly=false; i.classList.remove('locked-field', 'locked-cell'); i.style.backgroundColor="#fff";
+                }
+            }); 
+            document.getElementById('btn_bill_update').style.display = 'inline-block'; 
+            alert("Unlocked. Make changes and click 'Update & Save Bill'."); 
+        } else alert("Wrong Password"); 
+    }
+
+    function loadArchive() {
+        const archiveBody = document.getElementById('archiveBody');
+        archiveBody.innerHTML = "";
+        const archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        if (archive.length === 0) { archiveBody.innerHTML = "<tr><td colspan='5'>No records</td></tr>"; return; }
+        archive.sort((a, b) => (b.year - a.year) || (b.month - a.month));
+        archive.forEach((rec, idx) => {
+            archiveBody.innerHTML += `<tr><td>${rec.year}</td><td>${monthNames[rec.month]}</td><td style="color:#27ae60;">${parseFloat(rec.val).toFixed(4)} %</td><td>${rec.timestamp}</td><td><button class="btn-sm btn-view" onclick="viewArchivedPAFM(${idx})">View</button> <button class="btn-sm btn-del" onclick="deleteFromArchive(${rec.year}, ${rec.month})">Del</button></td></tr>`;
+        });
+    }
+
+    function viewArchivedPAFM(index) {
+        const archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        const rec = archive[index];
+        if(rec && rec.logs) {
+            globalData = rec.logs;
+            document.getElementById('sel_month').value = rec.month;
+            document.getElementById('sel_year').value = rec.year;
+            updateDateConfig(); 
+            calculateFinalSheet();
+            alert(`Loaded Archived Data for ${monthNames[rec.month]} ${rec.year}.`);
+        }
+    }
+
+    function saveFinalEntry() {
+        const m = parseInt(document.getElementById('sel_month').value);
+        const y = parseInt(document.getElementById('sel_year').value);
+        const pafmVal = document.getElementById('pafmValue').innerText;
+        const totIC = document.getElementById('totalIC').innerText;
+        const totDCi = document.getElementById('totalDCi').innerText;
+
+        let archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        const existingIndex = archive.findIndex(r => r.year === y && r.month === m);
+
+        if (existingIndex !== -1) {
+            if (prompt("Overwrite existing? Pass:") !== "admin") return;
+            archive.splice(existingIndex, 1);
+        }
+
+        const newRecord = { 
+            year: y, month: m, val: pafmVal, 
+            totalIC: totIC, totalDCi: totDCi,
+            logs: JSON.parse(JSON.stringify(globalData)),
+            timestamp: new Date().toLocaleString() 
+        };
+        archive.push(newRecord);
+        localStorage.setItem(PAFM_ARCHIVE_KEY, JSON.stringify(archive));
+        loadArchive();
+        
+        alert("Saved Final Entry. Data sheets are now UNLOCKED.");
+        switchTab('pafm');
+    }
+
+    function deleteFromArchive(y, m) {
+        if (prompt("Pass:") !== "admin") return;
+        let archive = JSON.parse(localStorage.getItem(PAFM_ARCHIVE_KEY) || "[]");
+        const newArchive = archive.filter(r => !(r.year === y && r.month === m));
+        localStorage.setItem(PAFM_ARCHIVE_KEY, JSON.stringify(newArchive));
+        loadArchive();
+    }
+
+    function getISODate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function formatTimeStr(m){ let h=Math.floor(m/60), mm=m%60; return `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; }
+    function exportToExcel(){ const t=document.getElementById("finalTable"), v=document.getElementById('pafmValue').innerText, h=`<html><body><h2>PAFM</h2>${t.outerHTML}<h3>Result: ${v}%</h3></body></html>`, b=new Blob([h],{type:"application/vnd.ms-excel"}), a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="PAFM.xls"; a.click(); }
+    window.onclick=function(e){if(e.target==modal)closeModal();}
+    
+    window.onload = function() {
+        initDate();
+        renderStandard(data_optcl, 'body_optcl', 'optcl'); renderStandard(data_gridco, 'body_gridco', 'gridco'); renderStandard(data_ohpc, 'body_ohpc', 'ohpc'); renderPsdf(data_psdf, 'body_psdf'); renderKv11(data_kv11, 'body_kv11'); renderGovt(data_govt, 'body_govt');
+        document.querySelectorAll('input').forEach(el=>checkInputState(el));
+        calcNetExport();
+        generateCalendar();
+        loadArchive();
+        checkForVersions();
+        updateProgress();
+        renderAbstract();
+    };
+</script>
+
+</body>
+</html>
